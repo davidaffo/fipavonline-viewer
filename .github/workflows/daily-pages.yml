@@ -1,0 +1,69 @@
+name: Aggiorna dati e pubblica
+
+on:
+  schedule:
+    # 05:17 italiane, anche durante l'ora legale.
+    - cron: '17 5 * * *'
+      timezone: Europe/Rome
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+concurrency:
+  group: pages-and-data
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  VITE_DATA_SOURCE: ${{ vars.DATA_SOURCE || 'static' }}
+  VITE_API_BASE_URL: ${{ vars.API_BASE_URL || '/api/v1/' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write # Conserva gli snapshot sul branch data-snapshots.
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - name: Ripristina gli ultimi dati validi
+        if: env.VITE_DATA_SOURCE == 'static'
+        run: bash scripts/snapshot-store.sh restore
+      - name: Scarica i dati configurati
+        id: sync
+        if: env.VITE_DATA_SOURCE == 'static'
+        run: npm run sync:configured
+      - name: Riepilogo sincronizzazione
+        if: always() && steps.sync.outcome != 'skipped' && env.VITE_DATA_SOURCE == 'static'
+        run: node scripts/sync-summary.mjs
+      - name: Build
+        run: npm run build
+      - name: Conserva i dati per la prossima esecuzione
+        if: env.VITE_DATA_SOURCE == 'static'
+        run: bash scripts/snapshot-store.sh save
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Pubblica su GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,1 +1,23 @@
-{"name":"volley-live","version":"1.0.0","private":true,"type":"module","scripts":{"dev":"python -m http.server 5173 --bind 127.0.0.1 --directory dist","check":"node --check dist/app.js && node --check dist/data.js && node --check dist/sw.js && node --test tests/data.test.js"}}
+{
+  "name": "fipavonline-viewer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "sync:fipav": "node scripts/sync-fipav.mjs",
+    "check": "node --check src/app.js && node --check scripts/sync-configured.mjs && node --check scripts/sync-summary.mjs && node --check vite.config.js && node --test tests/*.test.js",
+    "sync:configured": "node scripts/sync-configured.mjs"
+  },
+  "devDependencies": {
+    "ical.js": "^2.2.1",
+    "vite": "^8.3.4",
+    "vite-plugin-pwa": "^2.0.0"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "fflate": "^0.8.3"
+  }
+}

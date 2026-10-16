@@ -1,4 +1,10 @@
 node_modules/
+dist/
 *.tgz
 .DS_Store
-.openai/*.local.json
+.vite/
+
+.env
+.env.local
+.env.*.local
+public/data/**/*.tmp
