@@ -1,0 +1,32 @@
+{
+  "startedAt": 1792182807616,
+  "finishedAt": 1792182843110,
+  "status": "success",
+  "saved": 114,
+  "results": [
+    {
+      "committee": "03000",
+      "title": "C.R. LIGURIA",
+      "saved": 26,
+      "failures": []
+    },
+    {
+      "committee": "03008",
+      "title": "C.T. LIGURIA CENTRO",
+      "saved": 30,
+      "failures": []
+    },
+    {
+      "committee": "03011",
+      "title": "C.T. LIGURIA PONENTE",
+      "saved": 30,
+      "failures": []
+    },
+    {
+      "committee": "03104",
+      "title": "C.T. LIGURIA LEVANTE",
+      "saved": 28,
+      "failures": []
+    }
+  ]
+}
