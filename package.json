@@ -1,0 +1,1 @@
+{"name":"volley-live","version":"1.0.0","private":true,"type":"module","scripts":{"dev":"python -m http.server 5173 --bind 127.0.0.1 --directory dist","check":"node --check dist/app.js && node --check dist/data.js && node --check dist/sw.js && node --test tests/data.test.js"}}
