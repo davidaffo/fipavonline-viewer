@@ -6,6 +6,8 @@ const favorite = { type: 'team', id: '1', title: 'VOLLEY GENOVA', committee: '03
 
 test('abbreviazioni ufficiali: categoria separata dal girone, comprese le fasi', () => {
  assert.equal(competitionContext(group('12')).label, 'U19F · Gir. A');
+ assert.equal(competitionContext(group('12')).code, 'U19FA');
+ assert.equal(competitionContext({id:'12',title:'Seconda Divisione Femminile - Girone A'}).code,'2DFA');
  assert.equal(competitionContext({ ...group('12'), parent:'Prima Divisione Femminile', 'title-short':'1DFA' }).label, '1DF · Gir. A');
  assert.equal(competitionContext({ id:'12', title:'Serie C Maschile - Girone B' }).label, 'CM · Gir. B');
  assert.equal(competitionContext({ ...group('12','PO1FAS'), parent:'Serie C Maschile', 'title-short':'CMPO1FAS' }).label, 'CM · Gir. PO1FAS');

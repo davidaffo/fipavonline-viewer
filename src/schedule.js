@@ -50,7 +50,7 @@ export function scheduleMatches(records, { day = '' } = {}) {
   };
   for (const entry of entries) {
     const match = { ...entry, team1: resolveTeam(entry.team1, entry.committeeId), team2: resolveTeam(entry.team2, entry.committeeId) };
-    const key = `${match.groupId}:${match.id || `${dateISO(match)}:${match.time}:${match.team1?.id || match.team1?.title}:${match.team2?.id || match.team2?.title}`}`;
+    const key = `${match.committeeId}:${match.groupId}:${match.id || `${dateISO(match)}:${match.time}:${match.team1?.id || match.team1?.title}:${match.team2?.id || match.team2?.title}`}`;
     unique.set(key, mergeMatch(unique.get(key), match));
   }
   return [...unique.values()].filter(match => !day || dateISO(match) === day)

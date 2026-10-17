@@ -10,7 +10,7 @@ export const EXPORT_FIELDS = [
 ];
 export const OPTIONAL_EXPORT_COLUMNS = EXPORT_FIELDS.filter(([, , , optional]) => optional).map(([id, label]) => ({ id, label }));
 
-// Valori condivisi da Excel e iCalendar: le stesse opzioni selezionano gli stessi dati.
+// Valori delle colonne Excel, comprese quelle opzionali.
 export function exportMatchValues(game, metadata) {
   const competition = groupInfo(metadata.get(`${game.committeeId}:${game.groupId}`) || { title: game.groupTitle });
   const iso = dateISO(game);

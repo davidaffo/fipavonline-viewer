@@ -35,3 +35,22 @@ test('live più recente senza metadati società: aggiorna il risultato senza per
  const games=favoriteMatches([live,calendar],club);
  assert.equal(games.length,1);assert.equal(games[0]['team1-setwin'],2);assert.equal(games[0].team1.cod_aff_societa,club.id);
 });
+
+test('squadre preferite: unione dei comitati senza richieste duplicate', () => {
+ const favorites=[{type:'team',id:'1',committee:'03008'},{type:'team',id:'2',committee:'03008'},{type:'team',id:'1',committee:'03000'}];
+ assert.deepEqual(favoriteCommittees(favorites,committees).map(item=>item.id),['03008','03000']);
+ assert.deepEqual(favoriteCommittees([],committees),[]);
+});
+
+test('partite aggregate: derby una volta, date ordinate e ID uguali in comitati distinti', () => {
+ const favorites=[{type:'team',id:'1',committee:'03008'},{type:'team',id:'2',committee:'03008'},{type:'team',id:'1',committee:'03000'}];
+ const records=[
+  record('03008','1','20/10/2026',team('1'),team('2')),
+  record('03000','1','18/10/2026',team('1'),team('9')),
+  record('03008','3','19/10/2026',team('8'),team('9')),
+  record('04000','4','21/10/2026',team('1'),team('2')),
+ ];
+ const games=favoriteMatches(records,favorites);
+ assert.deepEqual(games.map(game=>`${game.committeeId}:${game.id}`),['03000:1','03008:1']);
+ assert.deepEqual(favoriteMatches(records,[]),[]);
+});

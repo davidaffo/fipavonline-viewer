@@ -35,11 +35,11 @@ export function renderMatchCard(match, { logo, star }) {
     const title = club?.title || String(team?.nome_societa || '').trim();
     return `<div class="match-club">${title ? `<span class="match-club-name" title="${e(title)}${club ? ` · Codice società: ${e(club.id)}` : ''}">${e(title)}</span>${club ? star('club',club.id,club.title,club.logo) : ''}` : ''}</div>`;
   };
+  const result = `<div class="match-result" aria-label="${state.hasScore ? 'Risultato in set' : 'Risultato non disponibile'}">${state.hasScore ? `<span>${e(match['team1-setwin'] ?? '–')}</span><span class="score-divider">-</span><span>${e(match['team2-setwin'] ?? '–')}</span>` : '<span class="unplayed-score">–</span>'}</div>`;
   return `<article class="match">
     ${match.groupId ? `<div class="match-competition"><span>${e([match.groupTitle || 'Girone '+match.groupId,match.committeeTitle].filter(Boolean).join(' · '))}</span>${match.committeeId ? `<button type="button" data-match-standings="${e(match.groupId)}" data-committee="${e(match.committeeId)}" aria-label="Classifica: ${e(match.groupTitle || 'Girone '+match.groupId)}">Classifica ↗</button>` : ''}</div>` : ''}
     <div class="match-meta"><span>${e(meta)}</span><span class="badge ${state.live ? 'live' : ''}">${state.live ? '● ' : ''}${e(state.status)}</span></div>
-    <div class="match-teams">${teams.map((team, i) => `${i ? '<span class="team-divider" aria-hidden="true">-</span>' : ''}<div class="match-team">${society(team)}${logo(team)}<strong>${e(team?.title || 'Squadra da definire')}</strong>${star('team', team?.id, team?.title)}</div>`).join('')}</div>
-    <div class="match-result" aria-label="${state.hasScore ? 'Risultato in set' : 'Risultato non disponibile'}">${state.hasScore ? `<span>${e(match['team1-setwin'] ?? '–')}</span><span class="score-divider">-</span><span>${e(match['team2-setwin'] ?? '–')}</span>` : '<span class="unplayed-score">–</span>'}</div>
+    <div class="match-teams">${teams.map((team, i) => `${i ? result : ''}<div class="match-team">${society(team)}${logo(team)}<strong>${e(team?.title || 'Squadra da definire')}</strong>${star('team', team?.id, team?.title)}</div>`).join('')}</div>
     ${state.sets.length ? `<ol class="set-scores" aria-label="Parziali dei set">${state.sets.map(([a, b], i) => `<li aria-label="Set ${i + 1}: ${e(a)} a ${e(b)}"><span class="set-number">${i + 1}°</span><span>${e(a)}-${e(b)}</span></li>`).join('')}</ol>` : ''}
     ${state.official ? `<p class="result-official">${e(state.official)}</p>` : ''}
     <div class="match-details"><div class="match-venue"><span>${e(match.stadium || 'Impianto da definire')}</span>${map ? `<a href="${e(map)}" target="_blank" rel="noopener noreferrer">Mappa ↗</a>` : ''}</div>

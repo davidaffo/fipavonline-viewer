@@ -13,7 +13,8 @@ export function competitionContext(group) {
   const short = String(group['title-short'] || '').trim();
   const category = short && suffix && short.endsWith(suffix) && short.length > suffix.length ? short.slice(0, -suffix.length) : categoryAbbreviation(info.championshipTitle);
   const label = `${category}${fullGroup === 'Girone unico' ? ' · Gir. unico' : ` · Gir. ${suffix}`}`;
-  return { groupId: String(group.id || ''), label, title: String(group.title || `${info.championshipTitle} - ${fullGroup}`) };
+  const code = (short || `${category}${fullGroup === 'Girone unico' ? 'U' : suffix}`).replace(/\s+/g, '');
+  return { groupId: String(group.id || ''), label, code, title: String(group.title || `${info.championshipTitle} - ${fullGroup}`) };
 }
 
 // Ricostruisce il contesto anche per i preferiti salvati prima di questo campo.

@@ -2,7 +2,6 @@ import { zipSync } from 'fflate';
 import { dateISO } from './data.js';
 import { competitionContext } from './team-label.js';
 import { exportGroupMetadata } from './export-data.js';
-import { OPTIONAL_EXPORT_COLUMNS, exportMatchValues } from './export-fields.js';
 import { uniqueFilename, calendarDownloadName } from './export-filenames.js';
 
 const encoder = new TextEncoder();
@@ -18,7 +17,7 @@ function localParts(timestamp) {
   return Object.fromEntries(rome.formatToParts(timestamp).filter(part => part.type !== 'literal').map(part => [part.type, Number(part.value)]));
 }
 function asUTC(parts) { return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second); }
-export function matchICSStart(game) {
+export function matchICSStart(game, warmupMinutes = 0) {
   const iso = validDate(game);
   if (!iso) return null;
   const time = /^(\d{1,2})[:.](\d{2})(?::(\d{2}))?$/.exec(String(game.time || '').trim());
@@ -29,7 +28,7 @@ export function matchICSStart(game) {
   // Campiona i due lati del cambio d'ora; non dipende dal fuso del dispositivo.
   const offsets = new Set([-86400000, 0, 86400000].map(delta => asUTC(localParts(wall + delta)) - (wall + delta)));
   const candidates = [...offsets].map(offset => wall - offset).filter(timestamp => asUTC(localParts(timestamp)) === wall).sort((a, b) => a - b);
-  return candidates.length ? { value: utcStamp(new Date(candidates[0])), allDay: false } : allDay;
+  return candidates.length ? { value: utcStamp(new Date(candidates[0] - warmupMinutes * 60000)), allDay: false } : allDay;
 }
 export function matchICSUID(game) {
   const identity = game.id || game.ng || `${game.team1?.id || game.team1?.title}-${game.team2?.id || game.team2?.title}-${dateISO(game)}`;
@@ -62,10 +61,9 @@ function fold(line) {
   lines.push(part);
   return lines.join('\r\n');
 }
-export function createICalendar(sections, records, { optionalColumns = [], issues = [], calendarName = '', warmupMinutes = 0, now = new Date() } = {}) {
+export function createICalendar(sections, records, { issues = [], calendarName = '', warmupMinutes = 0, now = new Date() } = {}) {
   if (!Number.isInteger(warmupMinutes) || warmupMinutes < 0 || warmupMinutes > 1440) throw new Error('Durata del riscaldamento non valida.');
   const metadata = exportGroupMetadata(records);
-  const enabled = new Set(optionalColumns);
   const games = uniqueGames(sections);
   const stats = icsExportStats(sections);
   const at = Math.min(...records.map(record => record.at).filter(value => Number.isFinite(value) && value > 0));
@@ -73,32 +71,32 @@ export function createICalendar(sections, records, { optionalColumns = [], issue
   const title = String(calendarName).trim() || (sections.length === 1 ? sections[0].title : 'FIPAVonline - Calendari');
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//FIPAVonline Viewer//Calendari//IT', 'CALSCALE:GREGORIAN', `X-WR-CALNAME;VALUE=TEXT:${escapeText(title)}`, 'X-WR-TIMEZONE:Europe/Rome', `X-WR-CALDESC;VALUE=TEXT:${escapeText(notes.join('\n'))}`];
   for (const game of games) {
-    const start = matchICSStart(game);
+    const start = matchICSStart(game, warmupMinutes);
     if (!start) continue;
-    const values = exportMatchValues(game, metadata);
     const context = competitionContext(metadata.get(`${game.committeeId}:${game.groupId}`) || { id: game.groupId, title: game.groupTitle });
-    const description = [`${values.championship} - ${values.group}`, values.day, `Gara ${values.matchNumber || 'da definire'}`, start.allDay ? 'Ora da definire' : '', ...OPTIONAL_EXPORT_COLUMNS.filter(column => enabled.has(column.id) && values[column.id]).map(column => `${column.label}: ${values[column.id]}`)].filter(Boolean);
-    if (!start.allDay && warmupMinutes) description.push(`Riscaldamento incluso: ${warmupMinutes} minuti`);
-    lines.push('BEGIN:VEVENT', `UID:${matchICSUID(game)}`, `DTSTAMP:${utcStamp(now)}`, `${start.allDay ? 'DTSTART;VALUE=DATE' : 'DTSTART'}:${start.value}`, `SUMMARY:${escapeText(`${values.home || 'Da definire'} - ${values.away || 'Da definire'} · ${context.label}`)}`, `DESCRIPTION:${escapeText(description.join('\n'))}`);
+    const home = String(game.team1?.title || '').trim() || 'Da definire';
+    const away = String(game.team2?.title || '').trim() || 'Da definire';
+    const venue = String(game.stadium || '').trim();
+    lines.push('BEGIN:VEVENT', `UID:${matchICSUID(game)}`, `DTSTAMP:${utcStamp(now)}`, `${start.allDay ? 'DTSTART;VALUE=DATE' : 'DTSTART'}:${start.value}`, `SUMMARY:${escapeText(`${context.code}-${home}-${away}`)}`);
     if (!start.allDay) lines.push(`DURATION:PT${120 + warmupMinutes}M`);
-    if (values.venue) lines.push(`LOCATION:${escapeText(values.venue)}`);
+    if (venue) lines.push(`LOCATION:${escapeText(venue)}`);
     lines.push('END:VEVENT');
   }
   lines.push('END:VCALENDAR');
   return lines.map(fold).join('\r\n') + '\r\n';
 }
-export async function buildICSDownload({ sections, records, optionalColumns = [], format = 'single', calendarName = '', warmupMinutes = 0, issues = [], progress = () => {}, signal }) {
+export async function buildICSDownload({ sections, records, format = 'single', calendarName = '', warmupMinutes = 0, issues = [], progress = () => {}, signal }) {
   signal?.throwIfAborted();
   if (!icsExportStats(sections).dated) throw new Error('Nessuna partita con data valida da esportare.');
   const customName = String(calendarName).trim();
   const name = customName ? uniqueFilename(customName, new Set()) : calendarDownloadName(sections);
-  if (format === 'single') return { bytes: encoder.encode(createICalendar(sections, records, { optionalColumns, issues, calendarName: customName, warmupMinutes })), filename: `${name}.ics`, type: 'text/calendar;charset=utf-8' };
+  if (format === 'single') return { bytes: encoder.encode(createICalendar(sections, records, { issues, calendarName: customName, warmupMinutes })), filename: `${name}.ics`, type: 'text/calendar;charset=utf-8' };
   const files = {}, names = new Set();
   for (const [index, section] of sections.entries()) {
     signal?.throwIfAborted();
     progress(`Creazione calendario ${index + 1}/${sections.length}…`);
     const title = customName ? (sections.length > 1 ? `${customName} - ${section.title}` : customName) : '';
-    if (icsExportStats([section]).dated) files[`${uniqueFilename(title || section.fileTitle || section.title, names)}.ics`] = encoder.encode(createICalendar([section], records, { optionalColumns, issues, calendarName: title, warmupMinutes }));
+    if (icsExportStats([section]).dated) files[`${uniqueFilename(title || section.fileTitle || section.title, names)}.ics`] = encoder.encode(createICalendar([section], records, { issues, calendarName: title, warmupMinutes }));
     await new Promise(resolve => setTimeout(resolve, 0));
   }
   signal?.throwIfAborted();

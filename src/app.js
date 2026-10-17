@@ -19,6 +19,7 @@ let tab='calendar',filter='all',query='',date=localDate(),groups=[],record=null,
 let standingsReturn=null,hidePlayed=false;
 let committeeList=[],selectedFavorite=null,detailRecords=[],profileTeamsOpen=true;
 const clubExpansions=new Map();
+const exportSelection=new Map();
 let teamFilter='',calendarMonth='',selectedCalendarDay='',calendarView=read('vl-calendar-view','day');
 let dateScope=read('vl-date-scope',calendarView==='list'?'all':'day');
 if(!['all','day'].includes(dateScope))dateScope='day';
@@ -74,7 +75,7 @@ async function loadSchedule(signal,seq){
 
 async function load(){
  controller?.abort();controller=new AbortController();const signal=controller.signal,seq=++request;loading=false;$('#refresh').disabled=false;
- record=null;message('');
+ record=null;message('');$('#selection-tools').hidden=true;
  $('#content').dataset.view=tab;
 
  $('#calendar-tools').hidden=true;$('#team-wrap').hidden=tab!=='calendar';$('.search').hidden=tab!=='clubs';
@@ -82,10 +83,11 @@ async function load(){
  $('#championship-wrap').hidden=!['calendar','standings'].includes(tab);$('#group-wrap').hidden=!['calendar','standings'].includes(tab);$('.segmented').hidden=tab!=='calendar';
  $('#standings-back').hidden=tab!=='standings'||!standingsReturn;
  $('#favorite-back').hidden=tab!=='favorite-detail';
- const titles={calendar:['Calendario','Partite del comitato selezionato.','Partite'],standings:['Classifica','Classifica del girone selezionato.','Classifica'],clubs:['Società','Società presenti nei calendari del comitato.','Società'],favorites:['Preferiti','Società, squadre e gironi salvati.','Preferiti']};
+ const titles={calendar:['Calendario','Partite del comitato selezionato.','Partite'],standings:['Classifica','Classifica del girone selezionato.','Classifica'],clubs:['Società','Società presenti nei calendari del comitato.','Società'],favorites:['Preferiti','Società, squadre e gironi salvati.','Preferiti'],'favorite-matches':['Partite preferiti','Tutte le date e i comitati delle squadre salvate.','Partite']};
  const t=tab==='favorite-detail'?[selectedFavorite?.title||'Preferito',selectedFavorite?.type==='club'?'Società · Tutte le squadre e i comitati della regione.':'Squadra · Tutte le partite disponibili.','Partite']:titles[tab];$('#page-title').textContent=t[0];$('#subtitle').textContent=t[1];$('#list-title').textContent=t[2];
  if(tab==='favorites'){render();return}
- if(tab==='favorite-detail'){await loadFavoriteDetail(signal,seq);return}
+ if(tab==='favorite-detail'){if(!selectedFavorite){switchTab('favorites');return}await loadFavoriteSchedule(signal,seq,[selectedFavorite]);return}
+ if(tab==='favorite-matches'){await loadFavoriteSchedule(signal,seq,prefs.favorites.filter(favorite=>favorite.type==='team'));return}
  if(!prefs.committee){render();return}
  if(tab==='calendar'||tab==='clubs'){await loadSchedule(signal,seq);return}
  if(tab==='standings'){
@@ -108,7 +110,7 @@ function matchCard(match){return renderMatchCard({...match,committeeId:match.com
 function favoriteContextRecords(){
  const records=[...detailRecords];
  for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key.startsWith('vl-data:')){const rec=read(key,null);if(rec)records.push({...rec,committee:key.split(':')[1]})}}
- if(record&&prefs.committee&&tab!=='favorite-detail')records.push({...record,committee:prefs.committee});
+ if(record&&prefs.committee&&!['favorite-detail','favorite-matches'].includes(tab))records.push({...record,committee:prefs.committee});
  return records;
 }
 function contextBadges(favorite){return (favorite.contexts||[]).map(context=>`<span class="team-context-label" title="${e(context.title)}">${e(context.label)}</span>`).join('')}
@@ -120,7 +122,7 @@ function teamName(team,committee,records){
 function societyCard(club,records){
  return renderClubCard(club,{
   open:clubExpansions.get(favoriteKey('club',club.id,club.committee))!==false,
-  logo:clubLogo,star,exportAction:exportButton,
+  logo:clubLogo,star,selectionAction:selectionCheckbox,
   teamName:(team,committee)=>teamName(team,committee,records),
   committeeTitle:id=>committeeList.find(committee=>committee.id===id)?.title||'',
  });
@@ -131,9 +133,9 @@ function savedClub(favorite,records){
 
 function render(){
  $('#fav-count').textContent=prefs.favorites.length;
- $('#hide-played-wrap').hidden=!['calendar','favorite-detail'].includes(tab);
+ $('#hide-played-wrap').hidden=!['calendar','favorite-detail','favorite-matches'].includes(tab);
  $('#hide-played').checked=hidePlayed;
- const exportable=Boolean(prefs.committee&&(tab==='clubs'||tab==='favorite-detail'||(tab==='calendar'&&teamFilter.startsWith('id:'))));
+ const exportable=Boolean((tab==='favorite-matches'&&prefs.favorites.some(favorite=>favorite.type==='team'))||prefs.committee&&(tab==='favorite-detail'||(tab==='calendar'&&teamFilter.startsWith('id:'))));
  $('#view-export').hidden=!exportable;
  $('#calendar-tools').hidden=tab!=='calendar'||!record;
  if(tab==='favorites'){
@@ -141,14 +143,16 @@ function render(){
  const knownClubs=new Map(collectClubs(scheduleMatches(contextRecords)).map(club=>[club.id,club]));
  const enriched=prefs.favorites.map(f=>{const club=f.type==='club'?knownClubs.get(f.id):null;return club&&club.title!=='Società non indicata'?{...f,title:club.title,logo:club.logo||f.logo}:enrichTeamFavorite(f,contextRecords)});
  if(JSON.stringify(enriched)!==JSON.stringify(prefs.favorites)){prefs.favorites=enriched;savePrefs()}
- const favs=prefs.favorites.filter(f=>f.type==='club'||!prefs.committee||f.committee===prefs.committee);
+ const favoriteOrder={team:0,club:1,group:2};
+ const favs=prefs.favorites.filter(f=>f.type==='club'||!prefs.committee||f.committee===prefs.committee)
+  .sort((a,b)=>(favoriteOrder[a.type]??3)-(favoriteOrder[b.type]??3));
  $('#updated').textContent='Salvati su questo dispositivo';
- $('#results').innerHTML=favs.length?favs.map(f=>f.type==='club'?savedClub(f,contextRecords):`<article class="saved"><button class="saved-open" data-open-favorite="${e(f.key)}" aria-label="Apri ${e(favoriteTitle(f))}"><span><small>${f.type==='team'?'SQUADRA':'GIRONE'}</small><strong>${e(f.title)} ${contextBadges(f)}</strong></span><span aria-hidden="true">↗</span></button>${f.type==='team'?exportButton('team',f.id,f.title,f.committee):''}<button data-remove="${e(f.key)}" aria-label="Rimuovi ${e(f.title)}">×</button></article>`).join(''):empty('Nessun preferito','Usa la stella accanto a una società, squadra o girone per salvarli.');
+ $('#results').innerHTML=favs.length?favs.map(f=>f.type==='club'?savedClub(f,contextRecords):`<article class="saved">${f.type==='team'?selectionCheckbox('team',f.id,f.title,f.committee):''}<button class="saved-open" data-open-favorite="${e(f.key)}" aria-label="Apri ${e(favoriteTitle(f))}"><span><small>${f.type==='team'?'SQUADRA':'GIRONE'}</small><strong>${e(f.title)} ${contextBadges(f)}</strong></span><span aria-hidden="true">↗</span></button><button data-remove="${e(f.key)}" aria-label="Rimuovi ${e(f.title)}">×</button></article>`).join(''):empty('Nessun preferito','Usa la stella accanto a una società, squadra o girone per salvarli.');
  bindCards();return;
  }
- if(tab==='favorite-detail'){
+ if(tab==='favorite-detail'||tab==='favorite-matches'){
   $('#updated').textContent=record?`Dati dal · ${new Date(record.at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}`:'';
-  renderFavoriteDetail();return;
+  if(tab==='favorite-matches')renderFavoriteMatches();else renderFavoriteDetail();return;
  }
  if(!prefs.committee){$('#updated').textContent='';$('#results').innerHTML=empty('Seleziona un comitato','Scegli il comitato dal menu.');return}
  $('#updated').textContent=record?`${record.source==='schedule'?'Dati dal':record.source==='snapshot'?'Scaricati da FIPAV':record.source==='import'?'Importati':record.source==='network'&&!record.fromCache?'Ricevuti':'Salvati'} · ${new Date(record.at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}`:'';
@@ -164,8 +168,7 @@ function render(){
  $('#view-export').hidden=!teamFilter.startsWith('id:');
  updateCalendarTools();
  if(calendarView==='month'){renderCalendarGrid(list);return}
- const map=new Map();for(const m of list){const key=dateISO(m)||'da-definire';if(!map.has(key))map.set(key,[]);map.get(key).push(m)}
- $('#results').innerHTML=list.length?(prefs.group?groupHeading(prefs.group,'Girone '+prefs.group):'')+[...map].map(([id,ms])=>`<h3 class="date-heading">${e(id==='da-definire'?'Data da definire':new Date(id+'T12:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'}))}</h3>`+ms.map(matchCard).join('')).join(''):empty('Nessuna gara trovata','Modifica la data o i filtri.');bindCards();
+ $('#results').innerHTML=list.length?(prefs.group?groupHeading(prefs.group,'Girone '+prefs.group):'')+datedMatches(list):empty('Nessuna gara trovata','Modifica la data o i filtri.');bindCards();
 }
 
 function updateTeamOptions(games){
@@ -223,6 +226,7 @@ function groupHeading(id,title){
  return `<div class="group-heading"><div><span class="championship-name">${e(info.championshipTitle)}</span><strong>${e(info.groupTitle)}</strong></div>${star('group',id,`${info.championshipTitle} - ${info.groupTitle}`)}</div>`;
 }
 function bindCards(){
+ updateExportSelection();
  document.querySelectorAll('[data-match-standings]').forEach(button=>button.onclick=()=>{
   standingsReturn={tab,committee:prefs.committee,group:prefs.group,championship:prefs.championship,filter,teamFilter,calendarMonth,selectedCalendarDay,date,calendarView,dateScope};
   prefs.committee=button.dataset.committee;prefs.group=button.dataset.matchStandings;prefs.championship='';
@@ -255,9 +259,8 @@ $('#standings-back').onclick=()=>{
  $('#date').value=date;document.querySelectorAll('[data-filter]').forEach(button=>button.classList.toggle('active',button.dataset.filter===filter));
  $('#committee').value=prefs.committee;savePrefs();switchTab(previous.tab,{preserveFilter:true});
 };
-async function loadFavoriteDetail(signal,seq){
- if(!selectedFavorite){switchTab('favorites');return}
- const favorite={...selectedFavorite};const targets=favoriteCommittees(favorite,committeeList);const targetIds=new Set(targets.map(target=>target.id));
+async function loadFavoriteSchedule(signal,seq,favorites){
+ const targets=favoriteCommittees(favorites,committeeList);const targetIds=new Set(targets.map(target=>target.id));
  const records=new Map();let missing=0;
  const cacheRecord=(key,rec,committee,title)=>{if(rec)records.set(key,{...rec,committee,committeeTitle:title})};
  for(let i=0;i<localStorage.length;i++){
@@ -281,6 +284,18 @@ async function loadFavoriteDetail(signal,seq){
   if(missing&&seq===request)message('Alcuni calendari non sono disponibili. La vista include le partite recuperate e quelle salvate.',true);
  }finally{if(seq===request){loading=false;$('#refresh').disabled=false;render()}}
 }
+function datedMatches(games){
+ const dates=new Map();
+ for(const game of games){const day=dateISO(game)||'da-definire';if(!dates.has(day))dates.set(day,[]);dates.get(day).push(game)}
+ return [...dates].map(([day,list])=>`<h3 class="date-heading">${e(day==='da-definire'?'Data da definire':new Date(day+'T12:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'}))}</h3>${list.map(matchCard).join('')}`).join('');
+}
+function renderFavoriteMatches(){
+ const favorites=prefs.favorites.filter(favorite=>favorite.type==='team');
+ const games=filterPlayedMatches(favoriteMatches(detailRecords,favorites),hidePlayed);
+ $('#list-title').textContent=`${games.length} ${games.length===1?'partita':'partite'} · ${favorites.length} ${favorites.length===1?'squadra':'squadre'}`;
+ $('#results').innerHTML=games.length?datedMatches(games):empty(!favorites.length?'Nessuna squadra preferita':loading?'Caricamento':'Nessuna partita disponibile',!favorites.length?'Salva le squadre usando la stella accanto al nome.':loading?'Recupero dei calendari.':hidePlayed?'Nessuna partita da mostrare con il filtro attivo.':'Non sono presenti partite per le squadre preferite nei calendari disponibili.');
+ bindCards();
+}
 function renderFavoriteDetail(){
  if(!selectedFavorite)return;
  const contextRecords=favoriteContextRecords();
@@ -292,16 +307,15 @@ function renderFavoriteDetail(){
  $('#list-title').textContent=`${games.length} ${games.length===1?'partita':'partite'}`;
  const team=teams[0];const logo=selectedFavorite.logo||team?.logo||'';
  const header=`<div class="favorite-profile"><div class="favorite-profile-heading">${clubLogo({logo})}<div><span>${selectedFavorite.type==='club'?'Società':'Squadra'}</span><strong>${e(selectedFavorite.title)} ${contextBadges(selectedFavorite)}</strong>${selectedFavorite.type==='club'?`<small>Codice società: ${e(selectedFavorite.id)}</small>`:''}</div>${star(selectedFavorite.type,selectedFavorite.id,selectedFavorite.title,logo,selectedFavorite.committee)}</div><div class="favorite-stats"><span><strong>${allGames.length}</strong> partite</span><span><strong>${played}</strong> terminate</span><span><strong>${allGames.length-played}</strong> da completare</span></div></div>`;
- const teamList=selectedFavorite.type==='club'&&teams.length?`<details class="favorite-team-list profile-team-expansion" ${profileTeamsOpen?'open':''}><summary>Squadre (${teams.length})</summary>${teams.map((item,index)=>`<div class="favorite-team-row"><button class="favorite-team-open" data-profile-team="${index}">${clubLogo(item)}<span><strong>${teamName(item,item.committee,contextRecords)}</strong><small>${e(committeeList.find(committee=>committee.id===item.committee)?.title||'')}</small></span><span aria-hidden="true">↗</span></button>${exportButton('team',String(item.id),item.title,item.committee)}${star('team',String(item.id),item.title,item.logo||'',item.committee)}</div>`).join('')}</details>`:'';
- const dates=new Map();for(const game of games){const date=dateISO(game)||'da-definire';if(!dates.has(date))dates.set(date,[]);dates.get(date).push(game)}
- $('#results').innerHTML=header+teamList+(games.length?[...dates].map(([date,list])=>`<h3 class="date-heading">${e(date==='da-definire'?'Data da definire':new Date(date+'T12:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'}))}</h3>`+list.map(matchCard).join('')).join(''):empty(loading?'Caricamento':'Nessuna partita disponibile',loading?'Recupero dei calendari.':hidePlayed?'Nessuna partita da mostrare con il filtro attivo.':'Non sono presenti partite per questo preferito nei calendari disponibili.'));
+ const teamList=selectedFavorite.type==='club'&&teams.length?`<details class="favorite-team-list profile-team-expansion" ${profileTeamsOpen?'open':''}><summary>Squadre (${teams.length})</summary>${teams.map((item,index)=>`<div class="favorite-team-row">${selectionCheckbox('team',String(item.id),item.title,item.committee)}<button class="favorite-team-open" data-profile-team="${index}">${clubLogo(item)}<span><strong>${teamName(item,item.committee,contextRecords)}</strong><small>${e(committeeList.find(committee=>committee.id===item.committee)?.title||'')}</small></span><span aria-hidden="true">↗</span></button>${star('team',String(item.id),item.title,item.logo||'',item.committee)}</div>`).join('')}</details>`:'';
+ $('#results').innerHTML=header+teamList+(games.length?datedMatches(games):empty(loading?'Caricamento':'Nessuna partita disponibile',loading?'Recupero dei calendari.':hidePlayed?'Nessuna partita da mostrare con il filtro attivo.':'Non sono presenti partite per questo preferito nei calendari disponibili.'));
  const expansion=$('.profile-team-expansion');if(expansion)expansion.ontoggle=()=>{profileTeamsOpen=expansion.open};
  document.querySelectorAll('[data-profile-team]').forEach(button=>button.onclick=()=>{const item=teams[Number(button.dataset.profileTeam)];openFavorite({type:'team',id:String(item.id),title:item.title,logo:item.logo||'',committee:item.committee})});
  bindCards();
 }
-function switchTab(next,{fromMatch=false,preserveFilter=false}={}){if(!fromMatch)standingsReturn=null;if(tab!==next&&!preserveFilter){query='';$('#search').value='';filter='all';document.querySelectorAll('[data-filter]').forEach(b=>b.classList.toggle('active',b.dataset.filter==='all'))}tab=next;document.querySelectorAll('[data-tab]').forEach(b=>{b.classList.toggle('active',b.dataset.tab===(tab==='favorite-detail'?'favorites':tab));b.setAttribute('aria-current',b.dataset.tab===(tab==='favorite-detail'?'favorites':tab)?'page':'false')});load()}
+function switchTab(next,{fromMatch=false,preserveFilter=false}={}){if(tab!==next)exportSelection.clear();if(!fromMatch)standingsReturn=null;if(tab!==next&&!preserveFilter){query='';$('#search').value='';filter='all';document.querySelectorAll('[data-filter]').forEach(b=>b.classList.toggle('active',b.dataset.filter==='all'))}tab=next;document.querySelectorAll('[data-tab]').forEach(b=>{b.classList.toggle('active',b.dataset.tab===(tab==='favorite-detail'?'favorites':tab));b.setAttribute('aria-current',b.dataset.tab===(tab==='favorite-detail'?'favorites':tab)?'page':'false')});load()}
 function openHelp(){const kinds=prefs.group?['live','groups','calendar','standings']:['live','groups'];$('#source-links').innerHTML=prefs.committee?kinds.flatMap(k=>urls(k,prefs.committee,prefs.group).map((url,i)=>`<a href="${e(url)}" target="_blank" rel="noopener">Apri JSON ${e({live:'risultati',groups:'gironi',calendar:'calendario',standings:'classifica'}[k])}${i?' (API)':''} ↗</a>`)).join(''):'<p>Seleziona un comitato per aprire le sorgenti JSON.</p>';$('#help').showModal()}
-$('#committee').onchange=()=>{prefs.committee=$('#committee').value;prefs.group='';prefs.championship='';groups=[];teamFilter='';calendarMonth='';selectedCalendarDay='';savePrefs();load()};$('#championship').onchange=()=>{prefs.championship=$('#championship').value;prefs.group='';teamFilter='';calendarMonth='';selectedCalendarDay='';updateGroups();savePrefs();if(tab==='calendar')render();else load()};$('#group').onchange=()=>{prefs.group=$('#group').value;teamFilter='';calendarMonth='';selectedCalendarDay='';updateGroups();savePrefs();if(tab==='calendar')render();else load()};
+$('#committee').onchange=()=>{exportSelection.clear();prefs.committee=$('#committee').value;prefs.group='';prefs.championship='';groups=[];teamFilter='';calendarMonth='';selectedCalendarDay='';savePrefs();load()};$('#championship').onchange=()=>{prefs.championship=$('#championship').value;prefs.group='';teamFilter='';calendarMonth='';selectedCalendarDay='';updateGroups();savePrefs();if(tab==='calendar')render();else load()};$('#group').onchange=()=>{prefs.group=$('#group').value;teamFilter='';calendarMonth='';selectedCalendarDay='';updateGroups();savePrefs();if(tab==='calendar')render();else load()};
 $('#refresh').onclick=load;$('#info').onclick=openHelp;$('#search').oninput=ev=>{query=ev.target.value.toLocaleLowerCase('it').trim();render()};$('#date').value=date;$('#date').onchange=ev=>{date=ev.target.value||localDate();$('#date').value=date;render()};$('#today-button').onclick=()=>{date=localDate();$('#date').value=date;render()};
 for(const [id,step] of [['day-prev',-1],['day-next',1]])$('#'+id).onclick=()=>{const d=new Date(date+'T12:00:00');d.setDate(d.getDate()+step);date=localDate(d);$('#date').value=date;render()};
 for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>switchTab(b.dataset.tab);
@@ -322,14 +336,46 @@ if (import.meta.env.PROD) {
  )).catch(() => {});
 }
 
-function exportButton(type,id,title,committee){
- return `<span class="export-buttons">${[['xlsx','Excel'],['ics','ICS']].map(([format,label])=>`<button class="context-export" data-export-format="${format}" data-export-type="${e(type)}" data-export-id="${e(id)}" data-export-title="${e(title)}" data-export-committee="${e(committee)}" aria-label="Esporta ${label}: ${e(title)}">${label}</button>`).join('')}</span>`;
+function selectionCheckbox(type,id,title,committee){
+ const key=type==='club'?`club:${id}`:`team:${committee}:${id}`;
+ return `<label class="selection-checkbox" title="Seleziona ${e(title)}"><input type="checkbox" data-select-export="${e(key)}" data-type="${type}" data-id="${e(id)}" data-title="${e(title)}" data-committee="${e(committee)}" aria-label="Seleziona ${e(title)}" ${exportSelection.has(key)?'checked':''}></label>`;
 }
-async function startCalendarExport(button,favorite=null,fileType='xlsx'){
+function updateExportSelection(){
+ const inputs=[...document.querySelectorAll('#results [data-select-export]')];
+ $('#selection-tools').hidden=!inputs.length;
+ const count=exportSelection.size;
+ $('#selection-count').textContent=`${count} ${count===1?'selezionata':'selezionate'}`;
+ $('#selection-export').hidden=!count;
+ $('#clear-selection').hidden=!count;
+ $('#select-all').checked=!!inputs.length&&inputs.every(input=>input.checked);
+ $('#select-all').indeterminate=inputs.some(input=>input.checked)&&!$('#select-all').checked;
+}
+document.addEventListener('change',event=>{
+ const input=event.target.closest('[data-select-export]');if(!input)return;
+ const {selectExport:key,type,id,title,committee}=input.dataset;
+ if(input.checked)exportSelection.set(key,{type,id,title,committee});else exportSelection.delete(key);
+ for(const other of document.querySelectorAll('[data-select-export]'))if(other.dataset.selectExport===key)other.checked=input.checked;
+ updateExportSelection();
+});
+$('#select-all').onchange=event=>{
+ const checked=event.target.checked;
+ for(const input of document.querySelectorAll('#results [data-select-export]')){
+  input.checked=checked;input.dispatchEvent(new Event('change',{bubbles:true}));
+ }
+};
+$('#clear-selection').onclick=()=>{
+ exportSelection.clear();
+ for(const input of document.querySelectorAll('[data-select-export]'))input.checked=false;
+ updateExportSelection();
+};
+$('#selection-export').onclick=event=>{
+ const button=event.target.closest('[data-selection-format]');if(button)startCalendarExport(button,null,button.dataset.selectionFormat,[...exportSelection.values()]);
+};
+async function startCalendarExport(button,favorite=null,fileType='xlsx',selection=null){
  button.disabled=true;
  try{
   const {openCalendarExport}=await import('./export-dialog.js');
-  openCalendarExport({source:dataSource,committees:committeeList,committee:prefs.committee,fileType,
+  openCalendarExport({source:dataSource,committees:committeeList,committee:prefs.committee,fileType,selection,
    favorite:favorite?enrichTeamFavorite(favorite,favoriteContextRecords()):null,
    cached:()=>{
     const records=[];
@@ -347,9 +393,5 @@ $('#view-export').onclick=event=>{
  const button=event.target.closest('[data-view-export]');if(!button)return;
  let favorite=tab==='favorite-detail'?selectedFavorite:null;
  if(tab==='calendar'&&teamFilter.startsWith('id:'))favorite={type:'team',id:teamFilter.slice(3),title:calendarTeams(scheduleMatches(record?[record]:[])).find(team=>team.id===teamFilter)?.title||'Squadra',committee:prefs.committee};
- startCalendarExport(button,favorite,button.dataset.viewExport);
+ startCalendarExport(button,favorite,button.dataset.viewExport,tab==='favorite-matches'?prefs.favorites.filter(item=>item.type==='team'):null);
 };
-document.addEventListener('click',event=>{
- const button=event.target.closest('[data-export-type]');if(!button)return;
- startCalendarExport(button,{type:button.dataset.exportType,id:button.dataset.exportId,title:button.dataset.exportTitle,committee:button.dataset.exportCommittee},button.dataset.exportFormat);
-});

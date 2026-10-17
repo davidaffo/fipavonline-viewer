@@ -32,7 +32,7 @@ test('ICS: data senza orario come evento giornaliero, date mancanti o non valide
  const text=createICalendar(sections,records,{now});const parsed=events(text);
  assert.equal(parsed.length,2);
  const daily=new ICAL.Event(parsed[1]);assert.equal(daily.startDate.isDate,true);assert.equal(daily.startDate.toString(),'2026-10-17');
- assert.match(daily.description,/Ora da definire/);
+ assert.equal(parsed[1].hasProperty('description'),false);
  assert.match(parse(text).getFirstPropertyValue('x-wr-caldesc'),/2 partite senza data valida escluse/);
  await assert.rejects(buildCalendarDownload({sections:[{title:'Nessuna data',games:[match('1','')]}],records,fileType:'ics'}),/Nessuna partita con data valida/);
 });
@@ -49,12 +49,28 @@ test('ICS: escaping, CRLF e folding UTF-8, senza inserire eventi tramite testo e
  assert.ok(!text.includes('\uFFFD'));
 });
 
-test('ICS: numero gara sempre presente, checkbox applicate ai dettagli e campionato/girone sempre identificabili', () => {
- const basic=new ICAL.Event(events(make(match('1')))[0]);
- assert.match(basic.summary,/U19F · Gir\. A/);assert.match(basic.description,/Gara 0012/);assert.match(basic.description,/Under 19 Femminile - Girone A/);
- assert.ok(!basic.description.includes('Arbitri:'));assert.ok(!basic.description.includes('Risultato:'));
- const rich=new ICAL.Event(events(make(match('1'),{optionalColumns:['score','sets','referees','homeClubCode','matchId']}))[0]);
- for(const detail of ['Risultato: 3-0','Parziali: 25-20, 25-18, 25-22','Arbitri: Arbitro Uno','Codice società casa: 00001','ID gara: 1']) assert.ok(rich.description.includes(detail));
+test('ICS: titolo compatto con campionato e girone prima delle squadre, luogo dedicato e nessuna descrizione', () => {
+ const basic=events(make(match('1')))[0];
+ assert.equal(basic.getFirstPropertyValue('summary'),'U19FA-Volley a-Volley b');
+ assert.equal(basic.getFirstPropertyValue('location'),'Palestra, Via Roma; 12');
+ assert.equal(basic.hasProperty('description'),false);
+ const extra=events(make(match('1'),{optionalColumns:['score','sets','referees','homeClubCode','matchId']}))[0];
+ assert.equal(extra.hasProperty('description'),false);
+ assert.deepEqual(extra.getAllProperties().map(property=>property.name).sort(),['dtstamp','dtstart','duration','location','summary','uid']);
+ const noVenue=events(make({...match('1'),stadium:''}))[0];
+ assert.equal(noVenue.hasProperty('location'),false);
+});
+
+test('ICS: esempio richiesto e abbreviazione ricostruita quando manca quella ufficiale', () => {
+ const second={...group,parent:'Seconda Divisione Femminile',title:'Seconda Divisione Femminile - Girone A','title-short':'2DFA'};
+ const game={...match('1'),team1:{title:'PGS Auxilium'},team2:{title:'Normac AVB'},stadium:'PALESTRA ISEF - VIA COSTANZI - GENOVA - ISEF'};
+ const data=[{at:1000,committee:'03008',json:{data:[second]}}];
+ const text=createICalendar([{title:'Calendario',games:[game]}],data,{now});
+ const event=events(text)[0];
+ assert.equal(event.getFirstPropertyValue('summary'),'2DFA-PGS Auxilium-Normac AVB');
+ assert.equal(event.getFirstPropertyValue('location'),game.stadium);
+ const fallback=createICalendar([{title:'Calendario',games:[{...game,groupTitle:second.title}]}],[],{now});
+ assert.equal(events(fallback)[0].getFirstPropertyValue('summary'),'2DFA-PGS Auxilium-Normac AVB');
 });
 
 test('ICS unico: stessa selezione società/squadre, derby e riepilogo deduplicati, UID stabili al cambio data', async () => {
@@ -69,7 +85,7 @@ test('ICS unico: stessa selezione società/squadre, derby e riepilogo deduplicat
  assert.equal(events(new TextDecoder().decode(teamDownload.bytes)).length,1);
 });
 
-test('ICS ZIP: calendario completo e individuali, stessi UID/opzioni, segnalazioni e annullamento', async () => {
+test('ICS ZIP: calendario completo e individuali, titoli, luoghi, stessi UID, segnalazioni e annullamento', async () => {
  const sections=exportSections({games,records,scope:'club',clubId:'00001',grouping:'team'});
  const download=await buildCalendarDownload({sections,records,fileType:'ics',format:'separate',optionalColumns:['referees'],issues:['Calendario non aggiornato']});
  const files=unzipSync(download.bytes);assert.equal(Object.keys(files).length,sections.length);
@@ -78,7 +94,7 @@ test('ICS ZIP: calendario completo e individuali, stessi UID/opzioni, segnalazio
   assert.match(name,/^[a-z0-9-]+\.ics$/);
   const text=new TextDecoder().decode(bytes);
   assert.match(parse(text).getFirstPropertyValue('x-wr-caldesc'),/Calendario non aggiornato/);
-  for(const event of events(text))assert.match(event.getFirstPropertyValue('description'),/Arbitri: Arbitro Uno/);
+  for(const event of events(text)){assert.match(event.getFirstPropertyValue('summary'),/^U19FA-/);assert.equal(event.getFirstPropertyValue('location'),match('1').stadium);assert.equal(event.hasProperty('description'),false);}
  }
  const complete=events(new TextDecoder().decode(Object.entries(files).find(([name])=>name.includes('tutte-le-squadre'))[1]));
  assert.equal(complete.length,2);
@@ -88,16 +104,16 @@ test('ICS ZIP: calendario completo e individuali, stessi UID/opzioni, segnalazio
  await assert.rejects(buildCalendarDownload({sections,records,fileType:'ics',signal:controller.signal}),{name:'AbortError'});
 });
 
-test('ICS: durata base di due ore; il riscaldamento prolunga la fine senza spostare inizio o UID', () => {
- for (const game of [match('1'), match('1','24/10/2026','23.30')]) {
+test('ICS: durata base di due ore; il riscaldamento anticipa l’inizio senza spostare fine o UID', () => {
+ for (const game of [match('1'), match('1','17/10/2026','00.30'), match('1','29/03/2026','03.30'), match('1','25/10/2026','03.30')]) {
   const basic = new ICAL.Event(events(make(game))[0]);
   const warm = new ICAL.Event(events(make(game,{warmupMinutes:60}))[0]);
   assert.equal(basic.duration.toSeconds(),7200);
   assert.equal(warm.duration.toSeconds(),10800);
-  assert.equal(basic.startDate.toUnixTime(),warm.startDate.toUnixTime());
-  assert.equal(warm.endDate.toUnixTime()-basic.endDate.toUnixTime(),3600);
+  assert.equal(basic.startDate.toUnixTime()-warm.startDate.toUnixTime(),3600);
+  assert.equal(warm.endDate.toUnixTime(),basic.endDate.toUnixTime());
   assert.equal(basic.uid,warm.uid);
-  assert.match(warm.description,/Riscaldamento incluso: 60 minuti/);
+  assert.equal(warm.description,null);
  }
  const short = new ICAL.Event(events(make(match('1'),{warmupMinutes:30}))[0]);
  assert.equal(short.duration.toSeconds(),9000);
@@ -115,6 +131,10 @@ test('ICS: nome personalizzato nel calendario e nel download, senza modificare g
  assert.equal(component.getFirstPropertyValue('x-wr-calname'),calendarName);
  for (const item of component.getAllSubcomponents('vevent')) {
   const event=new ICAL.Event(item);assert.equal(event.duration.toSeconds(),10800);
+  const game=games.find(game=>matchICSUID(game)===event.uid);
+  const original=new ICAL.Event(events(make(game))[0]);
+  assert.equal(original.startDate.toUnixTime()-event.startDate.toUnixTime(),3600);
+  assert.equal(original.endDate.toUnixTime(),event.endDate.toUnixTime());
  }
  const basic=await buildCalendarDownload({sections,records,fileType:'ics'});
  assert.deepEqual(events(new TextDecoder().decode(basic.bytes)).map(item=>item.getFirstPropertyValue('uid')),component.getAllSubcomponents('vevent').map(item=>item.getFirstPropertyValue('uid')));
@@ -131,7 +151,13 @@ test('ICS ZIP: prefisso personalizzato, calendari distinguibili e durata applica
   const component=parse(new TextDecoder().decode(bytes));
   const name=component.getFirstPropertyValue('x-wr-calname');
   assert.ok(name.startsWith('Il mio club - '));names.push(name);
-  for (const item of component.getAllSubcomponents('vevent')) assert.equal(new ICAL.Event(item).duration.toSeconds(),9900);
+  for (const item of component.getAllSubcomponents('vevent')) {
+   const event=new ICAL.Event(item);assert.equal(event.duration.toSeconds(),9900);
+   const game=games.find(game=>matchICSUID(game)===event.uid);
+   const original=new ICAL.Event(events(make(game))[0]);
+   assert.equal(original.startDate.toUnixTime()-event.startDate.toUnixTime(),2700);
+   assert.equal(original.endDate.toUnixTime(),event.endDate.toUnixTime());
+  }
  }
  assert.equal(new Set(names).size,names.length);
 });
@@ -150,4 +176,15 @@ test('ICS: stesso filtro delle partite svolte per file unico e calendari nello Z
   const rows=events(new TextDecoder().decode(bytes));assert.equal(rows.length,1);
   assert.equal(rows[0].getFirstPropertyValue('uid'),matchICSUID(mixed[1]));
  }
+});
+
+test('ICS: squadre selezionate con checkbox, file unico deduplicato e file separati per selezione',async()=>{
+ const sections=exportSections({games,records,scope:'team',teamKeys:['03008:a','03008:c']});
+ assert.equal(sections.length,2);
+ const file=await buildCalendarDownload({sections,records,fileType:'ics'});
+ assert.equal(events(new TextDecoder().decode(file.bytes)).length,2);
+ const zip=await buildCalendarDownload({sections,records,fileType:'ics',format:'separate'});
+ const files=unzipSync(zip.bytes);assert.equal(Object.keys(files).length,2);
+ const counts=Object.values(files).map(bytes=>events(new TextDecoder().decode(bytes)).length).sort();
+ assert.deepEqual(counts,[1,2]);
 });

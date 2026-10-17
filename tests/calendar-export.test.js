@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import { unzipSync } from 'fflate';
 import { scheduleMatches } from '../src/schedule.js';
-import { exportSections, exportCatalog, buildCalendarDownload, OPTIONAL_EXPORT_COLUMNS } from '../src/calendar-export.js';
+import { exportSections, selectedExportSections, exportCatalog, buildCalendarDownload, OPTIONAL_EXPORT_COLUMNS } from '../src/calendar-export.js';
 import { loadExportRecords } from '../src/export-data.js';
 
 const team = (id, club = '00001') => ({ id, title: '=VOLLEY', cod_aff_societa: club, nome_societa: club === '00001' ? 'Società / Uno' : 'Società : Due' });
@@ -193,4 +193,60 @@ test('Excel: nascondi svolte filtra squadra, società, calendario completo e ogn
   assert.ok(!sheet.getColumn(headers.indexOf('ID gara')).values.includes(String(mixed[0].id)));
  }
  assert.equal(mixed[0].played,true);
+});
+
+test('selezione multipla: squadre per ID, nessuna selezione e sottoinsieme società senza includere squadre escluse',async()=>{
+ const selected=exportSections({games,records,scope:'team',teamKeys:['03008:a','03008:d','03008:a']});
+ assert.deepEqual(selected.map(section=>section.key),['03008:a','03008:d']);
+ assert.deepEqual(selected.map(section=>section.games.map(game=>game.id)),[['1','2'],['3']]);
+ assert.equal(exportSections({games,records,scope:'team',teamKeys:[]}).length,0);
+ const one=exportSections({games,records,scope:'club',clubId:'00001',teamKeys:['03008:a'],grouping:'club'});
+ assert.equal(one.length,1);assert.equal(one[0].key,'03008:a');assert.ok(!one[0].combined);
+ const club=exportSections({games,records,scope:'club',clubId:'00001',teamKeys:['03008:a','03008:c'],grouping:'team'});
+ assert.equal(club.length,3);assert.ok(club[0].combined);
+ assert.match(club[0].title,/Squadre selezionate/);
+ assert.deepEqual(club[0].games.map(game=>game.id),['1','2']);
+ assert.deepEqual(club.slice(1).map(section=>section.key),['03008:a','03008:c']);
+ assert.equal(exportSections({games,records,scope:'club',clubId:'00001',teamKeys:['03008:b']}).length,0);
+ const file=await buildCalendarDownload({sections:selected,records});
+ const book=new ExcelJS.Workbook();await book.xlsx.load(file.bytes);
+ assert.equal(book.worksheets.length,3);
+ const zip=await buildCalendarDownload({sections:selected,records,format:'separate'});
+ assert.equal(Object.keys(unzipSync(zip.bytes)).length,2);
+});
+
+test('selezione dalle viste: squadre e società, senza duplicare le sezioni condivise', () => {
+ const selection=[{type:'club',id:'00001',committee:'03008'},{type:'team',id:'a',committee:'03008'},{type:'team',id:'b',committee:'03008'}];
+ const list=selectedExportSections({games,records,selection,grouping:'team'});
+ assert.deepEqual(list.map(section=>section.key),['club:00001:all','03008:a','03008:c','03008:d','03008:b']);
+ assert.equal(list[0].games.length,3);
+ assert.equal(selectedExportSections({games,records,selection:[],grouping:'team'}).length,0);
+ const otherCommittee=selectedExportSections({games,records,selection:[{type:'team',id:'a',committee:'03011'}]});
+ assert.equal(otherCommittee.length,0);
+ assert.equal(selectedExportSections({games,records,selection,hidePlayed:true}).length,0);
+});
+
+test('Excel: riepilogo opzionale condiviso fra società e selezione multipla di squadre', async () => {
+ const selection=[{type:'team',id:'a',committee:'03008'},{type:'team',id:'c',committee:'03008'},{type:'team',id:'d',committee:'03008'}];
+ const individual=selectedExportSections({games,records,selection,grouping:'team'});
+ assert.equal(individual.length,3);assert.ok(individual.every(section=>!section.combined));
+ const combined=selectedExportSections({games,records,selection,grouping:'team',includeCombined:true});
+ assert.equal(combined.length,4);assert.ok(combined[0].combined);
+ assert.deepEqual(combined[0].games.map(game=>game.id),['1','2','3']);
+ const file=await buildCalendarDownload({sections:combined,records});
+ const book=new ExcelJS.Workbook();await book.xlsx.load(file.bytes);
+ const summary=book.worksheets[0];
+ assert.deepEqual(summary.getRow(3).values.slice(1,3),['Campionato','Girone']);
+ assert.equal(summary.getTables().length,1);assert.equal(summary.rowCount,6);
+ assert.equal(summary.getCell('A4').value,'Under 19 Femminile');
+ assert.equal(summary.getCell('B4').value,'Girone A');
+ assert.equal(summary.getCell('A6').value,'Prima Divisione Femminile');
+ const company=[{type:'club',id:'00001',committee:'03008'}];
+ assert.ok(selectedExportSections({games,records,selection:company,grouping:'team'})[0].combined);
+ const without=selectedExportSections({games,records,selection:company,grouping:'team',includeCombined:false});
+ assert.equal(without.length,3);assert.ok(without.every(section=>!section.combined));
+ assert.equal(selectedExportSections({games,records,selection:[selection[0]],includeCombined:true}).length,1);
+ assert.equal(selectedExportSections({games,records,selection,includeCombined:true,hidePlayed:true}).length,0);
+ const zip=await buildCalendarDownload({sections:combined,records,format:'separate'});
+ assert.equal(Object.keys(unzipSync(zip.bytes)).length,4);
 });

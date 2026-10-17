@@ -24,25 +24,47 @@ export function exportCatalog(games, records) {
   }
   return { clubs: [...clubs.values()].sort(sort), teams: [...teams.values()].map(team => ({ ...team, label: `${team.title} · ${[...team.contexts].join(' / ')} · ${team.committee}` })).sort(sort) };
 }
-export function exportSections({ games, records, scope = 'all', clubId = '', teamKey = '', grouping = 'club', hidePlayed = false }) {
+function combinedSection({key,title,games,label='Squadre selezionate'}) {
+  const unique=new Map();
+  for(const game of games){
+    const identity=game.id||`${dateISO(game)}:${game.time}:${game.team1?.id}:${game.team2?.id}`;
+    unique.set(`${game.committeeId}:${game.groupId}:${identity}`,game);
+  }
+  return {key,sheetTitle:`Completo - ${title}`,title:`${title} - ${label}`,fileTitle:`${title} ${label}`,combined:true,combinedLabel:label,
+    games:[...unique.values()].sort((a,b)=>`${dateISO(a)||'9999'} ${String(a.time||'99:99').replace('.',':').padStart(5,'0')}`.localeCompare(`${dateISO(b)||'9999'} ${String(b.time||'99:99').replace('.',':').padStart(5,'0')}`)),
+  };
+}
+export function exportSections({ games, records, scope = 'all', clubId = '', teamKey = '', teamKeys, grouping = 'club', hidePlayed = false, includeCombined = scope !== 'team' }) {
   games = filterPlayedMatches(games, hidePlayed);
   const catalog = exportCatalog(games, records);
+  const keys = new Set(Array.isArray(teamKeys) ? teamKeys : teamKey ? [teamKey] : []);
+  const teamSection = team => ({ key: team.key, title: team.label, fileTitle: `${team.title} ${[...team.contexts].join(' ')}`, games: games.filter(game => [game.team1, game.team2].some(item => teamExportKey(game.committeeId, item?.id) === team.key)) });
   if (scope === 'team') {
-    const team = catalog.teams.find(team => team.key === teamKey);
-    return team ? [{ key: team.key, title: team.label, fileTitle: `${team.title} ${[...team.contexts].join(' ')}`, games: games.filter(game => [game.team1, game.team2].some(item => teamExportKey(game.committeeId, item?.id) === teamKey)) }] : [];
+    const teams=catalog.teams.filter(team => keys.has(team.key)).map(teamSection);
+    return includeCombined&&teams.length>1?[combinedSection({key:'teams:all',title:'Squadre selezionate',games:teams.flatMap(section=>section.games)}),...teams]:teams;
   }
-  const selected = scope === 'club' ? games.filter(game => [game.team1, game.team2].some(team => clubInfo(team)?.id === clubId)) : games;
-  const overview = club => ({
-    key: `club:${club.id}:all`, sheetTitle: `Completo - ${club.title}`, title: `${club.title} - Tutte le squadre`, fileTitle: `${club.title} tutte le squadre`, combined: true,
-    games: selected.filter(game => [game.team1, game.team2].some(team => clubInfo(team)?.id === club.id))
-      .sort((a, b) => `${dateISO(a) || '9999'} ${String(a.time || '99:99').replace('.', ':').padStart(5, '0')}`.localeCompare(`${dateISO(b) || '9999'} ${String(b.time || '99:99').replace('.', ':').padStart(5, '0')}`)),
-  });
+  const clubTeams = scope === 'club' ? catalog.teams.filter(team => team.clubId === clubId && (!Array.isArray(teamKeys) || keys.has(team.key))) : [];
+  if (scope === 'club' && Array.isArray(teamKeys) && clubTeams.length < 2) return clubTeams.map(teamSection);
+  const clubKeys = new Set(clubTeams.map(team => team.key));
+  const selected = scope === 'club' ? games.filter(game => [game.team1, game.team2].some(team => clubInfo(team)?.id === clubId && (!Array.isArray(teamKeys) || clubKeys.has(teamExportKey(game.committeeId, team?.id))))) : games;
+  const subset = scope === 'club' && Array.isArray(teamKeys) && clubTeams.length < catalog.teams.filter(team => team.clubId === clubId).length;
+  const overview=club=>combinedSection({key:`club:${club.id}:all`,title:club.title,label:subset?'Squadre selezionate':'Tutte le squadre',games:selected.filter(game=>[game.team1,game.team2].some(team=>clubInfo(team)?.id===club.id))});
   if (grouping === 'team') {
-    const teams = catalog.teams.filter(team => scope !== 'club' || team.clubId === clubId).map(team => ({ key: team.key, title: team.label, fileTitle: `${team.title} ${[...team.contexts].join(' ')}`, games: selected.filter(game => [game.team1, game.team2].some(item => teamExportKey(game.committeeId, item?.id) === team.key)) })).filter(section => section.games.length);
+    const teams = catalog.teams.filter(team => scope !== 'club' || clubKeys.has(team.key)).map(teamSection).filter(section => section.games.length);
     const club = scope === 'club' ? catalog.clubs.find(club => club.id === clubId) : null;
-    return club ? [overview(club), ...teams] : teams;
+    return club&&includeCombined ? [overview(club), ...teams] : teams;
   }
-  return catalog.clubs.filter(club => scope !== 'club' || club.id === clubId).flatMap(club => [overview(club), { key: club.id, title: club.title, games: selected.filter(game => [game.team1, game.team2].some(team => clubInfo(team)?.id === club.id)) }]);
+  return catalog.clubs.filter(club => scope !== 'club' || club.id === clubId).flatMap(club => [...(includeCombined?[overview(club)]:[]), { key: club.id, title: club.title, games: selected.filter(game => [game.team1, game.team2].some(team => clubInfo(team)?.id === club.id)) }]);
+}
+// Il riepilogo è predefinito per le società e facoltativo per le squadre.
+export function selectedExportSections({selection, includeCombined=selection.some(item=>item.type==='club'), ...options}) {
+  if(selection.length&&selection.every(item=>item.type==='team'))return exportSections({...options,scope:'team',teamKeys:selection.map(item=>teamExportKey(item.committee,item.id)),includeCombined});
+  const sections=new Map();
+  for(const item of selection){
+    const list=exportSections({...options,includeCombined,scope:item.type,clubId:item.type==='club'?item.id:'',teamKey:item.type==='team'?teamExportKey(item.committee,item.id):''});
+    for(const section of list)sections.set(section.key,section);
+  }
+  return [...sections.values()];
 }
 function uniqueName(title, used, limit = 31) {
   const base = String(title).replace(/[\\/?:*\[\]<>|"\x00-\x1f]/g, ' ').replace(/\s+/g, ' ').trim().replace(/^'+|'+$/g, '') || 'Calendario';
@@ -81,7 +103,7 @@ export function createCalendarWorkbook(sections, records, committees = [], optio
       const first = games[0];
       const info = groupInfo(metadata.get(`${first.committeeId}:${first.groupId}`) || { title: first.groupTitle });
       const committeeTitle = committees.find(committee => committee.id === first.committeeId)?.title || first.committeeTitle || '';
-      heading(section.combined ? 'Calendario completo - Tutte le squadre' : [`${info.championshipTitle} - ${info.groupTitle}`, committeeTitle].filter(Boolean).join(' · '));
+      heading(section.combined ? `Calendario completo - ${section.combinedLabel || 'Tutte le squadre'}` : [`${info.championshipTitle} - ${info.groupTitle}`, committeeTitle].filter(Boolean).join(' · '));
       const rows = games.map(game => {
         const values = exportMatchValues(game, metadata);
         return selectedColumns.map(([key]) => values[key]);
@@ -108,7 +130,7 @@ export async function buildCalendarDownload({ sections, records, committees, for
   if (!sections.length) throw new Error('Nessun calendario da esportare.');
   if (fileType === 'ics') {
     const { buildICSDownload } = await import('./ics-export.js');
-    return buildICSDownload({ sections, records, committees, format, calendarName, warmupMinutes, optionalColumns, issues, progress, signal });
+    return buildICSDownload({ sections, records, format, calendarName, warmupMinutes, issues, progress, signal });
   }
   if (fileType !== 'xlsx') throw new Error('Formato di esportazione non valido.');
   const filename = calendarDownloadName(sections);
