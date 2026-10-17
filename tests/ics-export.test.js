@@ -87,3 +87,51 @@ test('ICS ZIP: calendario completo e individuali, stessi UID/opzioni, segnalazio
  const controller=new AbortController();controller.abort();
  await assert.rejects(buildCalendarDownload({sections,records,fileType:'ics',signal:controller.signal}),{name:'AbortError'});
 });
+
+test('ICS: durata base di due ore; il riscaldamento prolunga la fine senza spostare inizio o UID', () => {
+ for (const game of [match('1'), match('1','24/10/2026','23.30')]) {
+  const basic = new ICAL.Event(events(make(game))[0]);
+  const warm = new ICAL.Event(events(make(game,{warmupMinutes:60}))[0]);
+  assert.equal(basic.duration.toSeconds(),7200);
+  assert.equal(warm.duration.toSeconds(),10800);
+  assert.equal(basic.startDate.toUnixTime(),warm.startDate.toUnixTime());
+  assert.equal(warm.endDate.toUnixTime()-basic.endDate.toUnixTime(),3600);
+  assert.equal(basic.uid,warm.uid);
+  assert.match(warm.description,/Riscaldamento incluso: 60 minuti/);
+ }
+ const short = new ICAL.Event(events(make(match('1'),{warmupMinutes:30}))[0]);
+ assert.equal(short.duration.toSeconds(),9000);
+ const allDay = events(make(match('1','17/10/2026',''),{warmupMinutes:60}))[0];
+ assert.equal(allDay.hasProperty('duration'),false);
+ for (const minutes of [-1,Infinity,NaN,1.5,1441]) assert.throws(()=>make(match('1'),{warmupMinutes:minutes}),/Riscaldamento|riscaldamento/);
+});
+
+test('ICS: nome personalizzato nel calendario e nel download, senza modificare gli identificativi', async () => {
+ const sections = exportSections({games,records,scope:'team',teamKey:'03008:a'});
+ const calendarName='La mia squadra, stagione 2026/27';
+ const file=await buildCalendarDownload({sections,records,fileType:'ics',calendarName,warmupMinutes:60});
+ assert.equal(file.filename,'calendario-la-mia-squadra-stagione-2026-27.ics');
+ const component=parse(new TextDecoder().decode(file.bytes));
+ assert.equal(component.getFirstPropertyValue('x-wr-calname'),calendarName);
+ for (const item of component.getAllSubcomponents('vevent')) {
+  const event=new ICAL.Event(item);assert.equal(event.duration.toSeconds(),10800);
+ }
+ const basic=await buildCalendarDownload({sections,records,fileType:'ics'});
+ assert.deepEqual(events(new TextDecoder().decode(basic.bytes)).map(item=>item.getFirstPropertyValue('uid')),component.getAllSubcomponents('vevent').map(item=>item.getFirstPropertyValue('uid')));
+});
+
+test('ICS ZIP: prefisso personalizzato, calendari distinguibili e durata applicata a tutti i file', async () => {
+ const sections=exportSections({games,records,scope:'club',clubId:'00001',grouping:'team'});
+ const file=await buildCalendarDownload({sections,records,fileType:'ics',format:'separate',calendarName:'Il mio club',warmupMinutes:45});
+ assert.equal(file.filename,'calendario-il-mio-club.zip');
+ const files=unzipSync(file.bytes),names=[];
+ assert.equal(Object.keys(files).length,sections.length);
+ for(const [filename,bytes] of Object.entries(files)){
+  assert.match(filename,/^calendario-il-mio-club-[a-z0-9-]+\.ics$/);
+  const component=parse(new TextDecoder().decode(bytes));
+  const name=component.getFirstPropertyValue('x-wr-calname');
+  assert.ok(name.startsWith('Il mio club - '));names.push(name);
+  for (const item of component.getAllSubcomponents('vevent')) assert.equal(new ICAL.Event(item).duration.toSeconds(),9900);
+ }
+ assert.equal(new Set(names).size,names.length);
+});

@@ -52,7 +52,7 @@ main[data-view="standings"] .toolbar,main[data-view="clubs"] .toolbar,main[data-
 .calendar-export{width:min(560px,calc(100vw - 24px));max-height:calc(100dvh - 32px);padding:24px;overflow:auto}
 .calendar-export h2{padding-right:30px;margin-top:0}.export-fields{display:grid;gap:12px}
 .export-fields label{display:grid;gap:5px;font-size:12px;color:var(--muted)}
-.export-fields select{min-width:0;width:100%;padding:9px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--text)}
+.export-fields select,.export-fields input[type=text],.export-fields input[type=number]{min-width:0;width:100%;padding:9px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--text)}
 .export-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.export-actions button{padding:10px 14px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text)}
 .export-actions [data-download]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 .export-issues{padding:10px;background:var(--warning-bg);color:var(--warning-text);border:1px solid var(--warning-line);font-size:12px;border-radius:6px}
@@ -72,3 +72,9 @@ main[data-view="standings"] .toolbar,main[data-view="clubs"] .toolbar,main[data-
 @media(max-width:640px){#list-navigation{gap:6px}#list-navigation #day-navigation{flex-basis:100%}.date-scope button{font-size:10px;padding:5px 8px;min-height:30px}}
 
 .export-columns{margin:16px 0 0;padding:10px;border:1px solid var(--line);border-radius:6px;min-width:0}.export-columns legend{font-size:12px;color:var(--muted);padding:0 4px}.export-columns>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px}.export-columns label{display:flex;align-items:center;gap:7px;min-height:28px;font-size:11px;cursor:pointer}.export-columns input[type=checkbox]{width:16px;height:16px;min-height:0;margin:0;flex-shrink:0;accent-color:var(--accent)}
+
+.export-buttons{display:inline-flex;align-items:center;gap:4px;flex:0 0 auto}.export-buttons>.context-export{width:auto;margin:0}
+.favorite-team-list .favorite-team-row>.export-buttons{flex-shrink:0}.favorite-team-list .export-buttons>.context-export{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:auto;margin:0;padding:5px;font-size:10px;min-height:32px}
+.export-fields .export-check{display:flex;align-items:center;gap:8px;min-height:32px;color:var(--text);cursor:pointer}.export-check input[type=checkbox]{width:16px;height:16px;min-height:0;margin:0;accent-color:var(--accent)}.export-fields [data-duration]{margin:0}
+.section-heading:has(#view-export:not([hidden])){flex-wrap:wrap}.section-actions{flex-wrap:wrap}
+@media(max-width:640px){.export-buttons{gap:3px}.section-actions #view-export .context-export{font-size:10px;padding:6px}.saved-club-content .favorite-team-open{gap:5px;padding:8px 5px}}

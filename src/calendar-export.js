@@ -102,11 +102,11 @@ export function createCalendarWorkbook(sections, records, committees = [], optio
   info.getCell('B2').numFmt = info.getCell('B3').numFmt = 'dd/mm/yyyy hh:mm';
   return workbook;
 }
-export async function buildCalendarDownload({ sections, records, committees, format = 'single', fileType = 'xlsx', optionalColumns = [], issues = [], progress = () => {}, signal }) {
+export async function buildCalendarDownload({ sections, records, committees, format = 'single', fileType = 'xlsx', calendarName = '', warmupMinutes = 0, optionalColumns = [], issues = [], progress = () => {}, signal }) {
   if (!sections.length) throw new Error('Nessun calendario da esportare.');
   if (fileType === 'ics') {
     const { buildICSDownload } = await import('./ics-export.js');
-    return buildICSDownload({ sections, records, committees, format, optionalColumns, issues, progress, signal });
+    return buildICSDownload({ sections, records, committees, format, calendarName, warmupMinutes, optionalColumns, issues, progress, signal });
   }
   if (fileType !== 'xlsx') throw new Error('Formato di esportazione non valido.');
   const filename = calendarDownloadName(sections);

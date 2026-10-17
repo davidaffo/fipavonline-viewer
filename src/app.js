@@ -133,7 +133,6 @@ function render(){
  $('#fav-count').textContent=prefs.favorites.length;
  const exportable=Boolean(prefs.committee&&(tab==='clubs'||tab==='favorite-detail'||(tab==='calendar'&&teamFilter.startsWith('id:'))));
  $('#view-export').hidden=!exportable;
- $('#view-export').textContent=tab==='clubs'?'Esporta comitato':tab==='favorite-detail'&&selectedFavorite?.type==='club'?'Esporta calendari':'Esporta calendario';
  $('#calendar-tools').hidden=tab!=='calendar'||!record;
  if(tab==='favorites'){
  const contextRecords=favoriteContextRecords();
@@ -319,14 +318,14 @@ if (import.meta.env.PROD) {
  )).catch(() => {});
 }
 
-function exportButton(type,id,title,committee,label='Esporta'){
- return `<button class="context-export" data-export-type="${e(type)}" data-export-id="${e(id)}" data-export-title="${e(title)}" data-export-committee="${e(committee)}" aria-label="Esporta ${e(title)}">${e(label)}</button>`;
+function exportButton(type,id,title,committee){
+ return `<span class="export-buttons">${[['xlsx','Excel'],['ics','ICS']].map(([format,label])=>`<button class="context-export" data-export-format="${format}" data-export-type="${e(type)}" data-export-id="${e(id)}" data-export-title="${e(title)}" data-export-committee="${e(committee)}" aria-label="Esporta ${label}: ${e(title)}">${label}</button>`).join('')}</span>`;
 }
-async function startCalendarExport(button,favorite=null){
+async function startCalendarExport(button,favorite=null,fileType='xlsx'){
  button.disabled=true;
  try{
   const {openCalendarExport}=await import('./export-dialog.js');
-  openCalendarExport({source:dataSource,committees:committeeList,committee:prefs.committee,
+  openCalendarExport({source:dataSource,committees:committeeList,committee:prefs.committee,fileType,
    favorite:favorite?enrichTeamFavorite(favorite,favoriteContextRecords()):null,
    cached:()=>{
     const records=[];
@@ -340,12 +339,13 @@ async function startCalendarExport(button,favorite=null){
   });
  }catch(error){message(`Esportazione non disponibile: ${error.message}`)}finally{button.disabled=false}
 }
-$('#view-export').onclick=()=>{
+$('#view-export').onclick=event=>{
+ const button=event.target.closest('[data-view-export]');if(!button)return;
  let favorite=tab==='favorite-detail'?selectedFavorite:null;
  if(tab==='calendar'&&teamFilter.startsWith('id:'))favorite={type:'team',id:teamFilter.slice(3),title:calendarTeams(scheduleMatches(record?[record]:[])).find(team=>team.id===teamFilter)?.title||'Squadra',committee:prefs.committee};
- startCalendarExport($('#view-export'),favorite);
+ startCalendarExport(button,favorite,button.dataset.viewExport);
 };
 document.addEventListener('click',event=>{
  const button=event.target.closest('[data-export-type]');if(!button)return;
- startCalendarExport(button,{type:button.dataset.exportType,id:button.dataset.exportId,title:button.dataset.exportTitle,committee:button.dataset.exportCommittee});
+ startCalendarExport(button,{type:button.dataset.exportType,id:button.dataset.exportId,title:button.dataset.exportTitle,committee:button.dataset.exportCommittee},button.dataset.exportFormat);
 });
