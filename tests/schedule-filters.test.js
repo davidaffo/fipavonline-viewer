@@ -20,3 +20,11 @@ test('scheda condivisa: la classifica conserva girone e comitato della partita, 
  const noContext=renderMatchCard({}, {logo:()=>'',star:()=>''});
  assert.ok(!noContext.includes('data-match-standings'));
 });
+
+test('nascondi svolte: disattivato per default; solo terminate escluse, mantenendo live e gare senza risultato',()=>{
+ const list=[{...games[0],played:'1',is_live:'0'},{...games[1],played:true,is_live:'1'},{...games[2],played:false,'team1-setwin':2}];
+ assert.equal(filterSchedule(list).length,3);
+ assert.deepEqual(filterSchedule(list,{hidePlayed:true}).map(game=>game.id),['b','c']);
+ assert.deepEqual(filterSchedule(list,{hidePlayed:true,group:'1'}),[]);
+ assert.equal(list.length,3);
+});

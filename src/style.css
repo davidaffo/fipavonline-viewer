@@ -78,3 +78,5 @@ main[data-view="standings"] .toolbar,main[data-view="clubs"] .toolbar,main[data-
 .export-fields .export-check{display:flex;align-items:center;gap:8px;min-height:32px;color:var(--text);cursor:pointer}.export-check input[type=checkbox]{width:16px;height:16px;min-height:0;margin:0;accent-color:var(--accent)}.export-fields [data-duration]{margin:0}
 .section-heading:has(#view-export:not([hidden])){flex-wrap:wrap}.section-actions{flex-wrap:wrap}
 @media(max-width:640px){.export-buttons{gap:3px}.section-actions #view-export .context-export{font-size:10px;padding:6px}.saved-club-content .favorite-team-open{gap:5px;padding:8px 5px}}
+
+.section-title{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;min-width:0}.section-heading{flex-wrap:wrap}.calendar-visibility{display:flex;align-items:center;gap:6px;min-height:28px;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap}.calendar-visibility input[type=checkbox]{width:15px;height:15px;min-height:0;margin:0;accent-color:var(--accent)}

@@ -177,3 +177,20 @@ test('export per società: un riepilogo per ciascuna società; la singola squadr
  const standalone=exportSections({games,records,scope:'team',teamKey:'03008:a'});
  assert.equal(standalone.length,1);assert.ok(!standalone[0].combined);
 });
+
+test('Excel: nascondi svolte filtra squadra, società, calendario completo e ogni file ZIP senza modificare gli originali',async()=>{
+ const mixed=games.map((game,index)=>({...game,played:index===0,is_live:'0'}));
+ const all=exportSections({games:mixed,records,scope:'club',clubId:'00001',grouping:'team'});
+ assert.equal(all[0].games.length,3);
+ const sections=exportSections({games:mixed,records,scope:'club',clubId:'00001',grouping:'team',hidePlayed:true});
+ assert.equal(sections[0].games.length,2);
+ assert.ok(sections.every(section=>section.games.every(game=>!game.played)));
+ assert.equal(exportSections({games:mixed,records,scope:'team',teamKey:'03008:b',hidePlayed:true}).length,0);
+ const zip=await buildCalendarDownload({sections,records,format:'separate',optionalColumns:['matchId']});
+ for(const bytes of Object.values(unzipSync(zip.bytes))){
+  const book=new ExcelJS.Workbook();await book.xlsx.load(bytes);
+  const sheet=book.worksheets[0],headers=sheet.getRow(3).values;
+  assert.ok(!sheet.getColumn(headers.indexOf('ID gara')).values.includes(String(mixed[0].id)));
+ }
+ assert.equal(mixed[0].played,true);
+});

@@ -20,6 +20,7 @@ export function openCalendarExport({ source, committees, committee, favorite, te
     <label data-field="club" hidden>Società<select name="club"></select></label>
     <label data-field="team" hidden>Squadra<select name="team"></select></label>
     <label data-field="grouping">Suddivisione<select name="grouping"><option value="club">Un foglio per società</option><option value="team">Un foglio per squadra</option></select></label>
+    <label class="export-check"><input name="hide-played" type="checkbox">Nascondi partite già svolte</label>
     <label>Download<select name="format"><option value="single">Un Excel con più fogli</option><option value="separate">Excel separati in uno ZIP</option></select></label>
     ${ics ? `<label>Nome calendario<input name="calendar-name" type="text" maxlength="200" required></label>
     <label class="export-check"><input name="include-warmup" type="checkbox">Includi riscaldamento</label>
@@ -45,7 +46,7 @@ export function openCalendarExport({ source, committees, committee, favorite, te
     for(const name of ['region','committee','scope'])field(name).closest('label').hidden=true;
   }
   function sections() {
-    return exportSections({ ...result, scope: field('scope').value, clubId: field('club').value, teamKey: field('team').value, grouping: field('grouping').value });
+    return exportSections({ ...result, scope: field('scope').value, clubId: field('club').value, teamKey: field('team').value, grouping: field('grouping').value, hidePlayed: field('hide-played').checked });
   }
   function selection() {
     const scope = field('scope').value;
@@ -118,6 +119,7 @@ export function openCalendarExport({ source, committees, committee, favorite, te
     field('include-warmup').onchange = selection;
     field('warmup-minutes').oninput = selection;
   }
+  field('hide-played').onchange = selection;
   dialog.querySelector('[data-reload]').onclick = load;
   download.onclick = async () => {
     for (const control of dialog.querySelectorAll('input, select')) if (!control.reportValidity()) return;
@@ -130,7 +132,7 @@ export function openCalendarExport({ source, committees, committee, favorite, te
       setTimeout(() => URL.revokeObjectURL(url), 30000);
       status(`Download pronto: ${file.filename}`);
     } catch (error) { if (!controller.signal.aborted) status(`Esportazione non riuscita: ${error.message}`); }
-    finally { if (dialog.open) { setBusy(false); download.disabled = !sections().length; } }
+    finally { if (dialog.open) { setBusy(false); const list=sections(); download.disabled=!list.length||(ics&&!icsExportStats(list).dated); } }
   };
   dialog.querySelector('.close').onclick = () => dialog.close();
   dialog.addEventListener('close', () => { controller?.abort(); dialog.remove(); }, { once: true });

@@ -135,3 +135,19 @@ test('ICS ZIP: prefisso personalizzato, calendari distinguibili e durata applica
  }
  assert.equal(new Set(names).size,names.length);
 });
+
+test('ICS: stesso filtro delle partite svolte per file unico e calendari nello ZIP',async()=>{
+ const mixed=games.map((game,index)=>({...game,played:index===0,is_live:'0'}));
+ const all=exportSections({games:mixed,records,scope:'club',clubId:'00001',grouping:'team'});
+ assert.equal(icsExportStats(all).dated,2);
+ const sections=exportSections({games:mixed,records,scope:'club',clubId:'00001',grouping:'team',hidePlayed:true});
+ const single=await buildCalendarDownload({sections,records,fileType:'ics'});
+ const remaining=events(new TextDecoder().decode(single.bytes));
+ assert.equal(remaining.length,1);
+ assert.equal(remaining[0].getFirstPropertyValue('uid'),matchICSUID(mixed[1]));
+ const zip=await buildCalendarDownload({sections,records,fileType:'ics',format:'separate'});
+ for(const bytes of Object.values(unzipSync(zip.bytes))){
+  const rows=events(new TextDecoder().decode(bytes));assert.equal(rows.length,1);
+  assert.equal(rows[0].getFirstPropertyValue('uid'),matchICSUID(mixed[1]));
+ }
+});

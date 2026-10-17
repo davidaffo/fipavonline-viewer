@@ -7,6 +7,7 @@ import { clubInfo } from './clubs.js';
 import { dateISO, groupInfo } from './data.js';
 import { competitionContext } from './team-label.js';
 import { exportGroupMetadata } from './export-data.js';
+import { filterPlayedMatches } from './schedule-filters.js';
 
 export const teamExportKey = (committee, id) => `${committee}:${id}`;
 const sort = (a, b) => a.title.localeCompare(b.title, 'it') || a.key.localeCompare(b.key);
@@ -23,7 +24,8 @@ export function exportCatalog(games, records) {
   }
   return { clubs: [...clubs.values()].sort(sort), teams: [...teams.values()].map(team => ({ ...team, label: `${team.title} · ${[...team.contexts].join(' / ')} · ${team.committee}` })).sort(sort) };
 }
-export function exportSections({ games, records, scope = 'all', clubId = '', teamKey = '', grouping = 'club' }) {
+export function exportSections({ games, records, scope = 'all', clubId = '', teamKey = '', grouping = 'club', hidePlayed = false }) {
+  games = filterPlayedMatches(games, hidePlayed);
   const catalog = exportCatalog(games, records);
   if (scope === 'team') {
     const team = catalog.teams.find(team => team.key === teamKey);
