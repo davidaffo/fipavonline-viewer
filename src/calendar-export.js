@@ -57,14 +57,18 @@ export function exportSections({ games, records, scope = 'all', clubId = '', tea
   return catalog.clubs.filter(club => scope !== 'club' || club.id === clubId).flatMap(club => [...(includeCombined?[overview(club)]:[]), { key: club.id, title: club.title, games: selected.filter(game => [game.team1, game.team2].some(team => clubInfo(team)?.id === club.id)) }]);
 }
 // Il riepilogo è predefinito per le società e facoltativo per le squadre.
-export function selectedExportSections({selection, includeCombined=selection.some(item=>item.type==='club'), ...options}) {
-  if(selection.length&&selection.every(item=>item.type==='team'))return exportSections({...options,scope:'team',teamKeys:selection.map(item=>teamExportKey(item.committee,item.id)),includeCombined});
+export function selectedExportSections({selection, includeCombined=selection.some(item=>item.type==='club'), includeUnified=false, ...options}) {
+  if(!includeUnified&&selection.length&&selection.every(item=>item.type==='team'))return exportSections({...options,scope:'team',teamKeys:selection.map(item=>teamExportKey(item.committee,item.id)),includeCombined});
   const sections=new Map();
   for(const item of selection){
     const list=exportSections({...options,includeCombined,scope:item.type,clubId:item.type==='club'?item.id:'',teamKey:item.type==='team'?teamExportKey(item.committee,item.id):''});
     for(const section of list)sections.set(section.key,section);
   }
-  return [...sections.values()];
+  const list=[...sections.values()];
+  if(!includeUnified||selection.length<2||!list.length)return list;
+  const catalog=exportCatalog(options.games,options.records);
+  const selectedClubs=[...new Map(selection.filter(item=>item.type==='club').map(item=>[item.id,{id:item.id,title:item.title||catalog.clubs.find(club=>club.id===item.id)?.title||item.id}])).values()];
+  return [{...combinedSection({key:'selection:all',title:'Selezione completa',label:'Società e squadre selezionate',games:list.flatMap(section=>section.games)}),selectedClubs},...list];
 }
 function uniqueName(title, used, limit = 31) {
   const base = String(title).replace(/[\\/?:*\[\]<>|"\x00-\x1f]/g, ' ').replace(/\s+/g, ' ').trim().replace(/^'+|'+$/g, '') || 'Calendario';
@@ -75,12 +79,12 @@ function uniqueName(title, used, limit = 31) {
 }
 export function createCalendarWorkbook(sections, records, committees = [], optionalColumns = []) {
   const enabled = new Set(optionalColumns);
-  const baseColumns = columns.filter(([id, , , optional]) => !optional || enabled.has(id));
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'FIPAVonline Viewer';
   const metadata = exportGroupMetadata(records), names = new Set();
   for (const section of sections) {
-    const selectedColumns = section.combined ? [['championship', 'Campionato', 28], ['group', 'Girone', 22], ...baseColumns] : baseColumns;
+    const baseColumns = columns.filter(([id, , , optional]) => !optional || enabled.has(id));
+    const selectedColumns = [...(section.selectedClubs?.length>1?[['selectedClub','Società',34]]:[]),...(section.combined ? [['championship', 'Campionato', 28], ['group', 'Girone', 22], ...baseColumns] : baseColumns)];
     const sheet = workbook.addWorksheet(uniqueName(section.sheetTitle || section.title, names));
     sheet.columns = selectedColumns.map(([, , width]) => ({ width }));
     const heading = (text, size = 12) => {
@@ -106,6 +110,7 @@ export function createCalendarWorkbook(sections, records, committees = [], optio
       heading(section.combined ? `Calendario completo - ${section.combinedLabel || 'Tutte le squadre'}` : [`${info.championshipTitle} - ${info.groupTitle}`, committeeTitle].filter(Boolean).join(' · '));
       const rows = games.map(game => {
         const values = exportMatchValues(game, metadata);
+        if(section.selectedClubs)values.selectedClub=section.selectedClubs.filter(club=>[game.team1,game.team2].some(team=>clubInfo(team)?.id===club.id)).map(club=>club.title).join(' / ');
         return selectedColumns.map(([key]) => values[key]);
       });
       const headerRow = sheet.rowCount + 1;

@@ -22,6 +22,7 @@ export function openCalendarExport({ source, committees, committee, favorite, te
 
     <label data-field="grouping">Suddivisione<select name="grouping"><option value="club">Un foglio per società</option><option value="team">Un foglio per squadra</option></select></label>
     ${ics ? '' : '<label class="export-check" data-field="combined"><input name="include-combined" type="checkbox">Includi foglio complessivo con campionato e girone</label>'}
+    ${ics ? '' : '<label class="export-check" data-field="unified" hidden><input name="include-unified" type="checkbox">Includi un foglio unico per tutte le società selezionate</label>'}
     <label class="export-check"><input name="hide-played" type="checkbox">Nascondi partite già svolte</label>
     <label data-field="format" hidden>Download<select name="format"><option value="single">Un Excel con più fogli</option><option value="separate">Excel separati in uno ZIP</option></select></label>
     ${ics ? `<label>Nome calendario<input name="calendar-name" type="text" maxlength="200" required></label>
@@ -50,7 +51,7 @@ export function openCalendarExport({ source, committees, committee, favorite, te
     for(const name of ['region','committee','scope'])field(name).closest('label').hidden=true;
   }
   function sections() {
-    const options={...result,grouping:field('grouping').value,hidePlayed:field('hide-played').checked,...(!ics?{includeCombined:field('include-combined').checked}:{})};
+    const options={...result,grouping:field('grouping').value,hidePlayed:field('hide-played').checked,...(!ics?{includeCombined:field('include-combined').checked,includeUnified:field('include-unified').checked}:{})};
     if(fixedSelection)return selectedExportSections({...options,selection:fixedSelection});
     return exportSections({...options,scope:field('scope').value,clubId:field('club').value,teamKey:preferredTeam});
   }
@@ -84,6 +85,7 @@ export function openCalendarExport({ source, committees, committee, favorite, te
     const list = sections();
     if(!ics){
       dialog.querySelector('[data-field=combined]').hidden=!canIncludeCombined();
+      dialog.querySelector('[data-field=unified]').hidden=!fixedSelection||new Set(fixedSelection.filter(item=>item.type==='club').map(item=>item.id)).size<2;
       note.hidden=!list.some(section=>section.combined);
       note.textContent='Il foglio complessivo riunisce le partite senza duplicati, con campionato e girone. Nello ZIP è un Excel aggiuntivo.';
     }
@@ -140,7 +142,7 @@ export function openCalendarExport({ source, committees, committee, favorite, te
     field('warmup-minutes').oninput = selection;
   }
   field('hide-played').onchange = selection;
-  if(!ics)field('include-combined').onchange=selection;
+  if(!ics)for(const name of ['include-combined','include-unified'])field(name).onchange=selection;
   dialog.querySelector('[data-reload]').onclick = load;
   download.onclick = async () => {
     for (const control of dialog.querySelectorAll('input, select')) if (!control.reportValidity()) return;

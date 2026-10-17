@@ -89,6 +89,14 @@ Le squadre nei preferiti e nelle viste delle società mostrano categoria e giron
 
 Le schede **Società** e **Preferiti** usano lo stesso componente espandibile (`src/club-card.js`), aperto di default, con squadre, categorie/gironi e stelle. Lo stato aperto/chiuso della società è condiviso tra le due schede durante la sessione.
 
-La voce **Partite preferiti** nel menu principale riunisce le gare di tutte le squadre salvate, anche di comitati diversi, ordinate per data. Una gara tra due squadre preferite compare una volta sola. Riutilizza le schede partita, il filtro **Nascondi partite già svolte** e i pulsanti di esportazione Excel e ICS. Le società preferite restano nella vista **Salvati**.
+La voce **Partite preferiti** nel menu principale riunisce le gare di tutte le squadre salvate, anche di comitati diversi, ordinate per data. Una gara tra due squadre preferite compare una volta sola. Riutilizza le schede partita, il filtro **Nascondi partite già svolte** e i pulsanti di esportazione Excel e ICS. Le società preferite restano nella vista **Preferiti**.
 
 Nel foglio complessivo delle squadre selezionate, le partite sono ordinate per data, i derby compaiono una sola volta e le colonne Campionato e Girone identificano la categoria di ogni gara. Disattivando il flag si mantengono soltanto i fogli individuali. La scelta vale anche per gli Excel separati nello ZIP.
+
+Da **Preferiti**, selezionare le checkbox di squadre o società e premere **Salva come vista**. Si possono assegnare un nome e scegliere i contenuti; la vista viene aggiunta al menu principale e salvata nel browser insieme ai preferiti. **Modifica vista** permette di cambiare nome e selezione, **Elimina vista** la rimuove. Le viste riutilizzano il caricamento delle partite dei preferiti, il filtro sulle gare concluse, le schede partita e l’esportazione Excel/ICS. La selezione di una vista resta salvata anche se una voce viene successivamente rimossa dai preferiti.
+
+Se si esportano almeno due società in Excel, il flag **Includi un foglio unico per tutte le società selezionate** aggiunge un riepilogo generale con campionato e girone, ordinato per data e senza gare duplicate. È indipendente dal flag per i riepiloghi delle singole società e funziona anche nello ZIP come Excel aggiuntivo.
+
+Il pulsante **Crea nuova vista** nel menu principale apre lo stesso editor anche senza preferiti: scegliere un comitato, cercare società o squadre e spuntare le voci da includere. Le scelte restano selezionate cambiando comitato. Anche **Modifica vista** permette di aggiungere voci non preferite. Viste e preferiti rimangono in `localStorage` nel browser; non vengono scritti nel repository o su un backend.
+
+Nel foglio unificato di più società, la prima colonna **Società** indica solo le società selezionate coinvolte in ciascuna partita. Se due società selezionate si incontrano, entrambe compaiono nella stessa cella e la gara rimane su una sola riga. Seguono Campionato e Girone; Società casa e Società ospite restano colonne opzionali.

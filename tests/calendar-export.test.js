@@ -250,3 +250,38 @@ test('Excel: riepilogo opzionale condiviso fra società e selezione multipla di 
  const zip=await buildCalendarDownload({sections:combined,records,format:'separate'});
  assert.equal(Object.keys(unzipSync(zip.bytes)).length,4);
 });
+
+test('Excel: foglio unico per più società, senza duplicare gare o includere voci escluse', async()=>{
+ const selection=[{type:'club',id:'00001',title:'Selezionata Uno',committee:'03008'},{type:'club',id:'00002',title:'Selezionata Due',committee:'03008'}];
+ const normal=selectedExportSections({games,records,selection,grouping:'team'});
+ assert.ok(normal.every(section=>section.key!=='selection:all'));
+ const sections=selectedExportSections({games,records,selection,grouping:'team',includeUnified:true});
+ assert.equal(sections.length,normal.length+1);
+ assert.equal(sections[0].combined,true);
+ assert.deepEqual(sections[0].games.map(game=>game.id),['1','2','3']);
+ const book=new ExcelJS.Workbook();
+ const file=await buildCalendarDownload({sections,records,optionalColumns:['referees']});
+ await book.xlsx.load(file.bytes);
+ assert.deepEqual(book.worksheets[0].getRow(3).values.slice(1,4),['Società','Campionato','Girone']);
+ assert.equal(book.worksheets[0].getTables().length,1);
+ assert.equal(book.worksheets[0].rowCount,6);
+ const summary=book.worksheets[0],headers=summary.getRow(3).values.slice(1);
+ assert.ok(!headers.includes('Società casa'));assert.ok(!headers.includes('Società ospite'));
+ assert.equal(summary.getCell('A4').value,'Selezionata Uno / Selezionata Due');
+ assert.equal(summary.getCell('A5').value,'Selezionata Uno');
+ assert.ok(!book.worksheets[1].getRow(3).values.includes('Società'));
+ const externalGame={...games[0],id:'external',team2:team('outside','00003')};
+ const withOutside=selectedExportSections({games:[externalGame],records,selection,grouping:'team',includeUnified:true});
+ const externalFile=await buildCalendarDownload({sections:[withOutside[0]],records});
+ const externalBook=new ExcelJS.Workbook();await externalBook.xlsx.load(externalFile.bytes);
+ assert.equal(externalBook.worksheets[0].getCell('A4').value,'Selezionata Uno');
+ const explicitFile=await buildCalendarDownload({sections:[sections[0]],records,optionalColumns:['homeClub','awayClub']});
+ const explicit=new ExcelJS.Workbook();await explicit.xlsx.load(explicitFile.bytes);
+ assert.equal(explicit.worksheets[0].getRow(3).values.filter(value=>value==='Società casa').length,1);
+ assert.equal(explicit.worksheets[0].getRow(3).values.filter(value=>value==='Società ospite').length,1);
+ const noCompanyOverviews=selectedExportSections({games,records,selection,grouping:'team',includeCombined:false,includeUnified:true});
+ assert.equal(noCompanyOverviews.filter(section=>section.combined).length,1);
+ const zip=await buildCalendarDownload({sections:noCompanyOverviews,records,format:'separate'});
+ assert.equal(Object.keys(unzipSync(zip.bytes)).length,noCompanyOverviews.length);
+ assert.equal(selectedExportSections({games,records,selection,includeUnified:true,hidePlayed:true}).length,0);
+});
