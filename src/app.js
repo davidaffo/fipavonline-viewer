@@ -2,7 +2,7 @@ import { viewItems, viewCatalog, openCustomViewDialog } from './custom-views.js'
 import { renderClubCard } from './club-card.js';
 import { competitionContext, enrichTeamFavorite, favoriteTitle } from './team-label.js';
 import { favoriteCommittees, favoriteMatches, favoriteTeams } from './favorite-view.js';
-import { calendarTeams, initialMonth, monthLabel, renderMonth, shiftMonth, fitMonthGrid } from './calendar.js';
+import { calendarTeams, initialMonth, monthCells, monthLabel, renderMonth, shiftMonth, fitMonthGrid } from './calendar.js';
 import { collectClubs, matchIsFavorite } from './clubs.js';
 import { renderMatchCard } from './match-card.js';
 import { filterSchedule, isPlayedMatch } from './schedule-filters.js';
@@ -230,7 +230,7 @@ function renderCalendarGrid(games){
  if(!calendarMonth)calendarMonth=initialMonth(games);
  $('#month-title').textContent=monthLabel(calendarMonth);
  const inMonth=games.filter(game=>dateISO(game).startsWith(calendarMonth));
- if(!selectedCalendarDay.startsWith(calendarMonth))selectedCalendarDay=dateISO(inMonth.find(game=>dateISO(game)>=localDate())||inMonth[0]||{});
+ if(!monthCells(calendarMonth).includes(selectedCalendarDay))selectedCalendarDay=dateISO(inMonth.find(game=>dateISO(game)>=localDate())||inMonth[0]||{});
  const selected=games.filter(game=>dateISO(game)===selectedCalendarDay);
  const undated=games.filter(game=>!/^\d{4}-\d{2}-\d{2}$/.test(dateISO(game)));
  $('#list-title').textContent=`${inMonth.length} ${inMonth.length===1?'partita':'partite'} nel mese · ${games.length} totali`;

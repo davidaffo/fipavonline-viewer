@@ -1,4 +1,4 @@
-import { dateISO, escapeHTML as e, localDate } from './data.js';
+import { dateISO, escapeHTML as e, localDate, groupInfo } from './data.js';
 import { matchPresentation } from './match-card.js';
 
 export function teamKey(team) { return team?.id ? `id:${team.id}` : team?.title ? `name:${team.title}` : ''; }
@@ -22,7 +22,7 @@ export function monthCells(month) {
   const days = new Date(year, number, 0, 12).getDate();
   return Array.from({ length: Math.ceil((offset + days) / 7) * 7 }, (_, index) => {
     const day = index - offset + 1;
-    return day > 0 && day <= days ? `${month}-${String(day).padStart(2, '0')}` : null;
+    return localDate(new Date(year, number - 1, day, 12));
   });
 }
 export function initialMonth(matches, today = localDate()) {
@@ -37,16 +37,19 @@ export function renderMonth(matches, { month, selectedDay }) {
   return `<div class="month-grid" role="group" aria-label="${e(monthLabel(month))}">
     ${['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'].map(day => `<div class="month-weekday" aria-hidden="true">${day}</div>`).join('')}
     ${monthCells(month).map(date => {
-      if (!date) return '<div class="month-blank" aria-hidden="true"></div>';
+      const outside = !date.startsWith(month);
+      const shortMonth = new Date(`${date}T12:00:00`).toLocaleDateString('it-IT', { month: 'short' });
       const games = byDate.get(date) || [];
       const label = new Date(`${date}T12:00:00`).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
-      return `<button type="button" class="month-day ${date === today ? 'is-today' : ''} ${date === selectedDay ? 'is-selected' : ''}" data-calendar-day="${date}" aria-pressed="${date === selectedDay}" aria-label="${e(label)}: ${games.length} partite">
-        <span class="month-day-number">${Number(date.slice(-2))}</span>
+      return `<button type="button" class="month-day ${outside ? 'is-outside-month' : ''} ${date === today ? 'is-today' : ''} ${date === selectedDay ? 'is-selected' : ''}" data-calendar-day="${date}" aria-pressed="${date === selectedDay}" aria-label="${e(label)}${outside ? ' (altro mese)' : ''}: ${games.length} partite">
+        <span class="month-day-number">${Number(date.slice(-2))}${outside ? `<span class="month-day-month">${e(shortMonth)}</span>` : ''}</span>
         ${games.length ? `<span class="month-day-count">${games.length} ${games.length === 1 ? 'gara' : 'gare'}</span>` : ''}
         <span class="month-events">${games.map(match => {
           const state = matchPresentation(match);
           const title = `${match.team1?.title || 'Da definire'} - ${match.team2?.title || 'Da definire'}`;
-          return `<span class="calendar-event ${state.live ? 'event-live' : ''}" title="${e(title)}" aria-label="${e(`${match.time || ''} ${title}`)}"><span class="event-time">${e(String(match.time || '').replace(/^(\d{1,2})\.(\d{2})$/, '$1:$2'))}${state.hasScore ? `<strong>${e(match['team1-setwin'] ?? '–')}-${e(match['team2-setwin'] ?? '–')}</strong>` : ''}</span><span>${e(match.team1?.title || 'Da definire')}</span><span>${e(match.team2?.title || 'Da definire')}</span></span>`;
+          const category = match.groupTitle ? groupInfo({ title: match.groupTitle }).championshipTitle : '';
+          const meta = [String(match.time || '').replace(/^(\d{1,2})\.(\d{2})$/, '$1:$2'), category].filter(Boolean).join(' · ');
+          return `<span class="calendar-event ${state.live ? 'event-live' : ''}" title="${e([meta, title].filter(Boolean).join(' · '))}" aria-label="${e(`${meta} ${title}`)}"><span class="event-time"><span class="event-meta">${e(meta)}</span>${state.hasScore ? `<strong>${e(match['team1-setwin'] ?? '–')}-${e(match['team2-setwin'] ?? '–')}</strong>` : ''}</span><span>${e(match.team1?.title || 'Da definire')}</span><span>${e(match.team2?.title || 'Da definire')}</span></span>`;
         }).join('')}<span class="month-more" hidden></span></span>
       </button>`;
     }).join('')}
