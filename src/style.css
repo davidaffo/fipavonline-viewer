@@ -136,3 +136,5 @@ button.action-delete{color:var(--delete);background:var(--delete-soft);border-co
   button.action-add:not(:disabled):hover{box-shadow:inset 0 0 0 1px var(--add)}
   button.action-delete:not(:disabled):hover{box-shadow:inset 0 0 0 1px var(--delete)}
 }
+.app-update-banner{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 32px;background:var(--accent-soft);border-bottom:1px solid var(--line);font-size:13px}.app-update-banner p{margin:5px 0 0;color:var(--muted)}.app-update-banner button{flex-shrink:0;border:0;border-radius:8px;padding:10px 14px;background:var(--accent);color:var(--on-accent);font-weight:600}#app-update-status{font-size:13px;color:var(--muted)}
+@media(max-width:640px){.app-update-banner{padding:12px;gap:10px;font-size:12px}.app-update-banner button{padding:10px;font-size:12px}}

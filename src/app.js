@@ -8,6 +8,7 @@ import { renderMatchCard } from './match-card.js';
 import { filterSchedule, isPlayedMatch } from './schedule-filters.js';
 import { scheduleMatches, combinedRecord } from './schedule.js';
 import { registerSW } from 'virtual:pwa-register';
+import { initAppUpdates } from './app-update.js';
 import { createDataSource } from './data-source.js';
 const dataSource=createDataSource({mode:import.meta.env.VITE_DATA_SOURCE||'static',base:import.meta.env.BASE_URL,apiBase:import.meta.env.VITE_API_BASE_URL||'/api/v1/'});
 import {escapeHTML as e,payload,classify,urls,dateISO,localDate,favoriteKey,groupInfo,championships,championshipGroups,teamLogo} from './data.js';
@@ -371,7 +372,7 @@ renderCustomNavigation();
 $('#today').textContent=new Intl.DateTimeFormat('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(new Date()).toUpperCase();setConnection();
 try{const r=await fetch(`${import.meta.env.BASE_URL}committees.json`);if(!r.ok)throw Error();const list=await r.json();committeeList=list;const regions=[...new Set(list.map(c=>c.region))];$('#committee').innerHTML='<option value="">Scegli un comitato</option>'+regions.map(region=>`<optgroup label="${e(region)}">${list.filter(c=>c.region===region).map(c=>`<option value="${e(c.id)}">${e(c.title)}</option>`).join('')}</optgroup>`).join('');$('#committee').value=prefs.committee}catch{message('Elenco comitati non disponibile. Riapri l’app quando sei online.')}load();
 if (import.meta.env.PROD) {
- registerSW({ immediate: true, onRegisterError() { message('Il salvataggio offline dell’app non è disponibile in questo browser.'); } });
+ initAppUpdates(registerSW);
 } else if ('serviceWorker' in navigator) {
  // Evita che la cache di una vecchia build interferisca con Vite e HMR.
  navigator.serviceWorker.getRegistrations().then(registrations => Promise.all(

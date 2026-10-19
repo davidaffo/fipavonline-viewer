@@ -7,7 +7,7 @@ export default defineConfig({
   preview: { host: '127.0.0.1', port: 4173, strictPort: true },
   plugins: [
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       injectRegister: false,
       includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png', 'committees.json'],
       manifest: {
