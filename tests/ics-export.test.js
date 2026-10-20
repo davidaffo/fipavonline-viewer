@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import ICAL from 'ical.js';
 import { unzipSync } from 'fflate';
 import { matchICSStart, matchICSUID, createICalendar, icsExportStats } from '../src/ics-export.js';
-import { buildCalendarDownload, exportSections } from '../src/calendar-export.js';
+import { buildCalendarDownload, exportSections, viewExportSections } from '../src/calendar-export.js';
 import { scheduleMatches } from '../src/schedule.js';
 
 const team = (id, club = '00001') => ({ id, title: `Volley ${id}`, cod_aff_societa: club, nome_societa: `Società ${club}` });
@@ -187,4 +187,30 @@ test('ICS: squadre selezionate con checkbox, file unico deduplicato e file separ
  const files=unzipSync(zip.bytes);assert.equal(Object.keys(files).length,2);
  const counts=Object.values(files).map(bytes=>events(new TextDecoder().decode(bytes)).length).sort();
  assert.deepEqual(counts,[1,2]);
+});
+
+
+test('ICS: intervallo inclusivo nel file unico e in tutti i calendari dello ZIP',async()=>{
+ const dated=[{...games[0],date:'15/10/2026'},...games.map(game=>({...game,date:'16/10/2026'})),{...games[0],id:'later',date:'17/10/2026'},{...games[0],id:'undated',date:''}];
+ const sections=exportSections({games:dated,records,scope:'club',clubId:'00001',grouping:'team',dateFrom:'2026-10-16',dateTo:'2026-10-16'});
+ for(const format of ['single','separate']){
+  const file=await buildCalendarDownload({sections,records,fileType:'ics',format});
+  const files=format==='single'?[file.bytes]:Object.values(unzipSync(file.bytes));
+  for(const bytes of files){
+   const rows=events(new TextDecoder().decode(bytes));assert.ok(rows.length>0);
+   for(const event of rows)assert.equal(event.getFirstPropertyValue('dtstart').toString().slice(0,10),'2026-10-16');
+  }
+ }
+});
+
+
+test('ICS della vista: solo le gare passate dalla vista, senza allargare alle squadre coinvolte',async()=>{
+ const visible=[games[1]];
+ const sections=viewExportSections({games:visible,title:'Vista filtrata'});
+ const file=await buildCalendarDownload({sections,records,fileType:'ics',calendarName:'Vista filtrata'});
+ const rows=events(new TextDecoder().decode(file.bytes));
+ assert.equal(rows.length,1);
+ assert.equal(rows[0].getFirstPropertyValue('uid'),matchICSUID(games[1]));
+ const all=await buildCalendarDownload({sections:viewExportSections({games,title:'Tutte le date'}),records,fileType:'ics'});
+ assert.equal(events(new TextDecoder().decode(all.bytes)).length,games.length);
 });

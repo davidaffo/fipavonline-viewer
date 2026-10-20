@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import ExcelJS from 'exceljs';
 import { unzipSync } from 'fflate';
 import { scheduleMatches } from '../src/schedule.js';
-import { exportSections, selectedExportSections, exportCatalog, buildCalendarDownload, OPTIONAL_EXPORT_COLUMNS } from '../src/calendar-export.js';
+import { exportSections, selectedExportSections, exportCatalog, buildCalendarDownload, OPTIONAL_EXPORT_COLUMNS, viewExportSections } from '../src/calendar-export.js';
+import { filterSchedule } from '../src/schedule-filters.js';
 import { loadExportRecords } from '../src/export-data.js';
 
 const team = (id, club = '00001') => ({ id, title: '=VOLLEY', cod_aff_societa: club, nome_societa: club === '00001' ? 'Società / Uno' : 'Società : Due' });
@@ -284,4 +285,44 @@ test('Excel: foglio unico per più società, senza duplicare gare o includere vo
  const zip=await buildCalendarDownload({sections:noCompanyOverviews,records,format:'separate'});
  assert.equal(Object.keys(unzipSync(zip.bytes)).length,noCompanyOverviews.length);
  assert.equal(selectedExportSections({games,records,selection,includeUnified:true,hidePlayed:true}).length,0);
+});
+
+
+test('periodo esportato: società, selezioni e riepilogo unico contengono solo le date incluse',async()=>{
+ const dated=games.map((game,index)=>({...game,date:['15/10/2026','16/10/2026','17/10/2026'][index]}));
+ const options={games:[...dated,{...dated[0],id:'undated',date:''}],records,dateFrom:'2026-10-16',dateTo:'2026-10-17'};
+ const sections=selectedExportSections({...options,selection:[{type:'club',id:'00001'},{type:'club',id:'00002'}],includeUnified:true});
+ assert.ok(sections.length>1);
+ assert.deepEqual(sections[0].games.map(game=>game.id),['2','3']);
+ for(const section of sections)assert.ok(section.games.every(game=>['2','3'].includes(game.id)));
+ const file=await buildCalendarDownload({sections,records});
+ const book=new ExcelJS.Workbook();await book.xlsx.load(file.bytes);
+ for(const sheet of book.worksheets.slice(0,-1)){
+  const dates=[];sheet.eachRow(row=>row.eachCell(cell=>{if(cell.value instanceof Date)dates.push(cell.value.toISOString().slice(0,10));}));
+  assert.ok(dates.length>0);
+  assert.ok(dates.every(date=>date>='2026-10-16'&&date<='2026-10-17'));
+ }
+ assert.deepEqual(exportSections({...options,dateFrom:'2027-01-01'}),[]);
+});
+
+
+test('esporta vista: conserva esattamente la selezione filtrata anche senza codici società',async()=>{
+ const list=games.map((game,index)=>({...game,date:['15/10/2026','16/10/2026','17/10/2026'][index],played:index===0,team1:{id:'a',title:'Casa'},team2:{id:'b',title:'Ospite'}}));
+ const visible=filterSchedule(list,{dateFrom:'2026-10-16',dateTo:'2026-10-16',team:'id:a',group:'1',hidePlayed:true});
+ const sections=viewExportSections({games:visible,title:'La mia vista'});
+ assert.equal(sections.length,1);
+ assert.deepEqual(sections[0].games.map(game=>game.id),['2']);
+ assert.equal(sections[0].title,'La mia vista');
+ const file=await buildCalendarDownload({sections,records});
+ const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(file.bytes);
+ const sheet=workbook.worksheets[0];
+ assert.equal(sheet.getRow(3).getCell(1).value,'Campionato');
+ assert.equal(sheet.getRow(3).getCell(2).value,'Girone');
+ assert.equal(sheet.rowCount,4);
+ assert.equal(sheet.getRow(4).getCell(5).value.toISOString().slice(0,10),'2026-10-16');
+ // Senza giorno o intervallo l'esportazione include tutte le date e le gare senza data.
+ const all=[...list,{...list[0],id:'undated',date:''}];
+ assert.equal(viewExportSections({games:filterSchedule(all),title:'Tutto'})[0].games.length,4);
+ assert.deepEqual(viewExportSections({games:[]}),[]);
+ assert.equal(list.length,3);
 });

@@ -52,7 +52,7 @@ header{height:64px}.layout{min-height:calc(100dvh - 64px)}main{padding-top:20px}
 .calendar-export{width:min(560px,calc(100vw - 24px));max-height:calc(100dvh - 32px);padding:24px;overflow:auto}
 .calendar-export h2{padding-right:30px;margin-top:0}.export-fields{display:grid;gap:12px}
 .export-fields label{display:grid;gap:5px;font-size:12px;color:var(--muted)}
-.export-fields select,.export-fields input[type=text],.export-fields input[type=number]{min-width:0;width:100%;padding:9px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--text)}
+.export-fields select,.export-fields input[type=text],.export-fields input[type=number],.export-fields input[type=date]{min-width:0;width:100%;padding:9px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--text)}
 .export-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.export-actions button{padding:10px 14px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text)}
 .export-actions [data-download]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 .export-issues{padding:10px;background:var(--warning-bg);color:var(--warning-text);border:1px solid var(--warning-line);font-size:12px;border-radius:6px}
@@ -139,3 +139,5 @@ button.action-delete{color:var(--delete);background:var(--delete-soft);border-co
 .app-update-banner{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 32px;background:var(--accent-soft);border-bottom:1px solid var(--line);font-size:13px}.app-update-banner p{margin:5px 0 0;color:var(--muted)}.app-update-banner button{flex-shrink:0;border:0;border-radius:8px;padding:10px 14px;background:var(--accent);color:var(--on-accent);font-weight:600}#app-update-status{font-size:13px;color:var(--muted)}
 .month-day.is-outside-month{background:var(--surface-alt)}.month-day.is-outside-month.is-selected{background:var(--accent-soft)}.month-day.is-outside-month .month-day-number{display:flex;gap:3px;width:fit-content;max-width:100%;border-radius:5px}.month-day-month{font-size:8px;font-weight:400}.calendar-event .event-meta{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.calendar-event .event-time strong{flex-shrink:0}
 @media(max-width:640px){.app-update-banner{padding:12px;gap:10px;font-size:12px}.app-update-banner button{padding:10px;font-size:12px}}
+
+#range-navigation{display:flex;flex-wrap:wrap;gap:8px}#range-navigation label{display:flex;align-items:center;gap:8px;font-size:11px}#range-navigation input{min-width:0;min-height:36px;padding:6px 8px;font-size:12px}

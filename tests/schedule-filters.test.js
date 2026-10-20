@@ -28,3 +28,15 @@ test('nascondi svolte: disattivato per default; solo terminate escluse, mantenen
  assert.deepEqual(filterSchedule(list,{hidePlayed:true,group:'1'}),[]);
  assert.equal(list.length,3);
 });
+
+
+test('intervallo inclusivo, limiti aperti, date mancanti e filtri combinati',()=>{
+ const list=[...games,{id:'d',date:'18/10/2026',groupId:'1'},{id:'missing'},{id:'unknown',date:'Da definire'}];
+ assert.deepEqual(filterSchedule(list,{dateFrom:'2026-10-16',dateTo:'2026-10-17'}).map(g=>g.id),['a','b','c']);
+ assert.deepEqual(filterSchedule(list,{dateFrom:'2026-10-17'}).map(g=>g.id),['b','d']);
+ assert.deepEqual(filterSchedule(list,{dateTo:'2026-10-16'}).map(g=>g.id),['a','c']);
+ assert.deepEqual(filterSchedule(list,{dateFrom:'2026-10-17',dateTo:'2026-10-17',groups,championship:'100',team:'id:1'}).map(g=>g.id),['b']);
+ assert.deepEqual(filterSchedule(list,{dateFrom:'2026-10-18',dateTo:'2026-10-16'}),[]);
+ assert.deepEqual(filterSchedule(list,{dateFrom:'2027-01-01'}),[]);
+ assert.equal(filterSchedule(list).length,list.length);
+});

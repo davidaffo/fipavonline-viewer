@@ -19,13 +19,14 @@ let prefs=read('vl-prefs',{committee:'',group:'',favorites:[]});
 if(!Array.isArray(prefs.favorites))prefs.favorites=[];
 prefs.views=Array.isArray(prefs.views)?prefs.views.filter(view=>view&&typeof view.id==='string'&&typeof view.title==='string').map(view=>({...view,items:viewItems(view.items)})):[];
 let tab='calendar',filter='all',query='',date=localDate(),groups=[],record=null,loading=false,request=0,controller;
-let standingsReturn=null,hidePlayed=false;
+let standingsReturn=null,hidePlayed=false,currentViewGames=[];
 let committeeList=[],selectedFavorite=null,detailRecords=[],profileTeamsOpen=true;
 const clubExpansions=new Map();
 const exportSelection=new Map();
 let teamFilter='',calendarMonth='',selectedCalendarDay='',calendarView='list';
 let dateScope=read('vl-date-scope',calendarView==='list'?'all':'day');
-if(!['all','day'].includes(dateScope))dateScope='day';
+let dateFrom=date,dateTo=date;
+if(!['all','day','range'].includes(dateScope))dateScope='day';
 const cacheKey=(kind,c=prefs.committee,g=prefs.group)=>`vl-data:${c}:${kind}:${kind==='live'||kind==='groups'?'':g}`;
 const savePrefs=()=>write('vl-prefs',prefs);
 const empty=(title,text,button='')=>`<div class="empty"><h3>${e(title)}</h3><p>${e(text)}</p>${button}</div>`;
@@ -172,10 +173,12 @@ function savedClub(favorite,records){
 }
 
 function render(){
+ currentViewGames=[];
+ for(const button of document.querySelectorAll('[data-view-export]'))button.disabled=true;
  $('#fav-count').textContent=prefs.favorites.length;
  $('#hide-played-wrap').hidden=!isScheduleView();
  $('#hide-played').checked=hidePlayed;
- const exportable=Boolean((isAggregateView()&&aggregateItems().length)||prefs.committee&&(tab==='favorite-detail'||(tab==='calendar'&&teamFilter.startsWith('id:'))));
+ const exportable=isScheduleView();
  $('#view-export').hidden=!exportable;
  $('#calendar-tools').hidden=!isScheduleView()||!record;
  if(tab==='favorites'){
@@ -204,7 +207,6 @@ function render(){
  updateTeamOptions(scoped);
  const all=filterSchedule(scoped,{team:teamFilter});
  const list=all.filter(m=>(filter!=='live'||Number(m.is_live)===1)&&(filter!=='favorites'||matchIsFavorite(m,prefs.favorites,prefs.committee)));
- $('#view-export').hidden=!teamFilter.startsWith('id:');
  renderSchedule(list,{heading:prefs.group?groupHeading(prefs.group,'Girone '+prefs.group):'',emptyTitle:'Nessuna gara trovata',emptyText:'Modifica la data o i filtri.'});
  bindCards();
 }
@@ -222,7 +224,7 @@ function updateTeamOptions(games){
  select.value=teamFilter;select.disabled=!options.length;
 }
 function updateCalendarTools(){
- $('#calendar-tools').hidden=false;$('#month-navigation').hidden=calendarView!=='month';$('#list-navigation').hidden=calendarView!=='list';$('#day-navigation').hidden=dateScope!=='day';
+ $('#calendar-tools').hidden=false;$('#month-navigation').hidden=calendarView!=='month';$('#list-navigation').hidden=calendarView!=='list';$('#day-navigation').hidden=dateScope!=='day';$('#range-navigation').hidden=dateScope!=='range';
  document.querySelectorAll('[data-date-scope]').forEach(button=>{const selected=button.dataset.dateScope===dateScope;button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected))});
  document.querySelectorAll('[data-calendar-view]').forEach(button=>{const selected=button.dataset.calendarView===calendarView;button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected))});
 }
@@ -237,6 +239,14 @@ function renderCalendarGrid(games){
  return renderMonth(games,{month:calendarMonth,selectedDay:selectedCalendarDay})+
  (selectedCalendarDay?`<section id="calendar-day-detail" class="calendar-day-detail"><h3 class="date-heading">${e(new Date(selectedCalendarDay+'T12:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'}))}</h3>${selected.length?selected.map(matchCard).join(''):empty('Nessuna partita','Nessuna gara per questo giorno e per i filtri selezionati.')}</section>`:empty('Nessuna partita nel mese','Cambia mese o filtro squadra.'))+
  (undated.length?`<h3 class="date-heading">Data da definire</h3>${undated.map(matchCard).join('')}`:'');
+}
+for(const id of ['date-from','date-to']){
+ $('#'+id).value=id==='date-from'?dateFrom:dateTo;
+ $('#'+id).onchange=()=>{
+  dateFrom=$('#date-from').value;dateTo=$('#date-to').value;
+  $('#date-from').max=dateTo;$('#date-to').min=dateFrom;
+  $('#'+id).reportValidity();render();
+ };
 }
 $('#hide-played').onchange=()=>{hidePlayed=$('#hide-played').checked;render()};
 for(const button of document.querySelectorAll('[data-date-scope]'))button.onclick=()=>{dateScope=button.dataset.dateScope;write('vl-date-scope',dateScope);render()};
@@ -326,8 +336,15 @@ function datedMatches(games){
  for(const game of games){const day=dateISO(game)||'da-definire';if(!dates.has(day))dates.set(day,[]);dates.get(day).push(game)}
  return [...dates].map(([day,list])=>`<h3 class="date-heading">${e(day==='da-definire'?'Data da definire':new Date(day+'T12:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'}))}</h3>${list.map(matchCard).join('')}`).join('');
 }
+function scheduleDateRange(){
+ if(calendarView!=='list')return {};
+ if(dateScope==='day')return {dateFrom:date,dateTo:date};
+ return dateScope==='range'?{dateFrom,dateTo}:{};
+}
 function renderSchedule(games,{prefix='',heading='',summary='',emptyTitle='Nessuna partita disponibile',emptyText='Non sono presenti partite per la selezione nei calendari disponibili.'}={}){
- const visible=filterSchedule(games,{day:calendarView==='list'&&dateScope==='day'?date:'',hidePlayed});
+ const visible=filterSchedule(games,{...scheduleDateRange(),hidePlayed});
+ currentViewGames=visible;
+ for(const button of document.querySelectorAll('[data-view-export]'))button.disabled=!visible.length;
  updateCalendarTools();
  $('#list-title').textContent=`${visible.length} ${visible.length===1?'partita':'partite'}${summary}`;
  $('#results').innerHTML=prefix+heading+(calendarView==='month'?renderCalendarGrid(visible):visible.length?datedMatches(visible):empty(emptyTitle,emptyText));
@@ -430,15 +447,20 @@ async function startCalendarExport(button,favorite=null,fileType='xlsx',selectio
  button.disabled=true;
  try{
   const {openCalendarExport}=await import('./export-dialog.js');
-  openCalendarExport({source:dataSource,committees:committeeList,committee:prefs.committee,fileType,selection,
+  openCalendarExport({source:dataSource,committees:committeeList,committee:prefs.committee,fileType,selection,dateRange:isScheduleView()?scheduleDateRange():{},hidePlayed:isScheduleView()&&hidePlayed,
    favorite:favorite?enrichTeamFavorite(favorite,favoriteContextRecords()):null,
    cached:cachedScheduleRecords
   });
  }catch(error){message(`Esportazione non disponibile: ${error.message}`)}finally{button.disabled=false}
 }
-$('#view-export').onclick=event=>{
- const button=event.target.closest('[data-view-export]');if(!button)return;
- let favorite=tab==='favorite-detail'?selectedFavorite:null;
- if(tab==='calendar'&&teamFilter.startsWith('id:'))favorite={type:'team',id:teamFilter.slice(3),title:calendarTeams(scheduleMatches(record?[record]:[])).find(team=>team.id===teamFilter)?.title||'Squadra',committee:prefs.committee};
- startCalendarExport(button,favorite,button.dataset.viewExport,isAggregateView()?aggregateItems():null);
+$('#view-export').onclick=async event=>{
+ const button=event.target.closest('[data-view-export]');if(!button||!currentViewGames.length)return;
+ const snapshot={games:structuredClone(currentViewGames),
+  records:structuredClone([...cachedScheduleRecords(),...detailRecords,...(tab==='calendar'&&record?[{...record,committee:prefs.committee}]:[])]),
+  committees:committeeList,title:$('#page-title').textContent,fileType:button.dataset.viewExport};
+ button.disabled=true;
+ try{
+  const {openViewExport}=await import('./view-export-dialog.js');
+  openViewExport(snapshot);
+ }catch(error){message(`Esportazione non disponibile: ${error.message}`)}finally{button.disabled=!currentViewGames.length}
 };

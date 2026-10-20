@@ -7,7 +7,7 @@ import { clubInfo } from './clubs.js';
 import { dateISO, groupInfo } from './data.js';
 import { competitionContext } from './team-label.js';
 import { exportGroupMetadata } from './export-data.js';
-import { filterPlayedMatches } from './schedule-filters.js';
+import { filterSchedule } from './schedule-filters.js';
 
 export const teamExportKey = (committee, id) => `${committee}:${id}`;
 const sort = (a, b) => a.title.localeCompare(b.title, 'it') || a.key.localeCompare(b.key);
@@ -34,8 +34,13 @@ function combinedSection({key,title,games,label='Squadre selezionate'}) {
     games:[...unique.values()].sort((a,b)=>`${dateISO(a)||'9999'} ${String(a.time||'99:99').replace('.',':').padStart(5,'0')}`.localeCompare(`${dateISO(b)||'9999'} ${String(b.time||'99:99').replace('.',':').padStart(5,'0')}`)),
   };
 }
-export function exportSections({ games, records, scope = 'all', clubId = '', teamKey = '', teamKeys, grouping = 'club', hidePlayed = false, includeCombined = scope !== 'team' }) {
-  games = filterPlayedMatches(games, hidePlayed);
+// Le partite sono quelle già filtrate dalla vista, senza ricaricare o ampliare la selezione.
+export function viewExportSections({games,title='Partite della vista'}) {
+  if(!games.length)return [];
+  return [{...combinedSection({key:'view:all',title,games,label:'Partite della vista'}),title,sheetTitle:title,fileTitle:title}];
+}
+export function exportSections({ games, records, scope = 'all', clubId = '', teamKey = '', teamKeys, grouping = 'club', hidePlayed = false, dateFrom = '', dateTo = '', includeCombined = scope !== 'team' }) {
+  games = filterSchedule(games, { hidePlayed, dateFrom, dateTo });
   const catalog = exportCatalog(games, records);
   const keys = new Set(Array.isArray(teamKeys) ? teamKeys : teamKey ? [teamKey] : []);
   const teamSection = team => ({ key: team.key, title: team.label, fileTitle: `${team.title} ${[...team.contexts].join(' ')}`, games: games.filter(game => [game.team1, game.team2].some(item => teamExportKey(game.committeeId, item?.id) === team.key)) });

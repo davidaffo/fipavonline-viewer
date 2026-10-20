@@ -4,7 +4,7 @@ import { escapeHTML as e } from './data.js';
 import { loadExportRecords } from './export-data.js';
 import { exportCatalog, exportSections, selectedExportSections, buildCalendarDownload, OPTIONAL_EXPORT_COLUMNS } from './calendar-export.js';
 
-export function openCalendarExport({ source, committees, committee, favorite, teamKey, cached, selection: selectedItems = null, fileType = 'xlsx' }) {
+export function openCalendarExport({ source, committees, committee, favorite, teamKey, cached, selection: selectedItems = null, fileType = 'xlsx', dateRange = {}, hidePlayed = false }) {
   if (!['xlsx', 'ics'].includes(fileType)) throw new Error('Formato di esportazione non valido.');
   const ics = fileType === 'ics';
   const dialog = document.createElement('dialog');
@@ -23,6 +23,8 @@ export function openCalendarExport({ source, committees, committee, favorite, te
     <label data-field="grouping">Suddivisione<select name="grouping"><option value="club">Un foglio per società</option><option value="team">Un foglio per squadra</option></select></label>
     ${ics ? '' : '<label class="export-check" data-field="combined"><input name="include-combined" type="checkbox">Includi foglio complessivo con campionato e girone</label>'}
     ${ics ? '' : '<label class="export-check" data-field="unified" hidden><input name="include-unified" type="checkbox">Includi un foglio unico per tutte le società selezionate</label>'}
+    <label>Dal<input name="date-from" type="date"></label>
+    <label>Al<input name="date-to" type="date"></label>
     <label class="export-check"><input name="hide-played" type="checkbox">Nascondi partite già svolte</label>
     <label data-field="format" hidden>Download<select name="format"><option value="single">Un Excel con più fogli</option><option value="separate">Excel separati in uno ZIP</option></select></label>
     ${ics ? `<label>Nome calendario<input name="calendar-name" type="text" maxlength="200" required></label>
@@ -30,12 +32,15 @@ export function openCalendarExport({ source, committees, committee, favorite, te
     <label data-warmup-minutes hidden>Riscaldamento (minuti)<input name="warmup-minutes" type="number" min="1" max="1440" step="1" value="60" required disabled></label>
     <p data-duration class="fine"></p>` : ''}</div>
     <p data-overview-note class="fine" hidden>Include anche un calendario completo per società, con campionato e girone.</p>${ics ? '' : `<fieldset class="export-columns"><legend>Colonne opzionali</legend><div>${OPTIONAL_EXPORT_COLUMNS.map(column => `<label><input type="checkbox" name="optional-column" value="${e(column.id)}"><span>${e(column.label)}</span></label>`).join('')}</div></fieldset>`}
-    <p class="fine">Calendari completi, indipendenti dalla data e dai filtri della vista.</p>
+    <p class="fine">Il periodo include le date Dal e Al. Lascia vuoti i campi per esportare tutte le date; con un limite attivo le gare senza data sono escluse.</p>
     <p data-ics-note class="fine" hidden></p><p data-status role="status"></p><p data-issues class="export-issues" hidden></p>
     <div class="export-actions"><button type="button" data-reload class="secondary">Ricarica dati</button><button type="button" data-download disabled>Scarica</button></div>`;
   const field = name => dialog.querySelector(`[name="${name}"]`);
   const status = text => { dialog.querySelector('[data-status]').textContent = text; };
   const download = dialog.querySelector('[data-download]');
+  field('date-from').value = dateRange.dateFrom || '';
+  field('date-to').value = dateRange.dateTo || '';
+  field('hide-played').checked = hidePlayed;
   let controller, result, catalog, busy = false, initial = true, nameEdited = false;
   if(!ics)field('include-combined').checked=fixedSelection?fixedSelection.some(item=>item.type==='club'):favorite?.type!=='team'&&!teamKey;
   const preferredTeam=teamKey||(favorite?.type==='team'?`${favorite.committee}:${favorite.id}`:'');
@@ -51,7 +56,7 @@ export function openCalendarExport({ source, committees, committee, favorite, te
     for(const name of ['region','committee','scope'])field(name).closest('label').hidden=true;
   }
   function sections() {
-    const options={...result,grouping:field('grouping').value,hidePlayed:field('hide-played').checked,...(!ics?{includeCombined:field('include-combined').checked,includeUnified:field('include-unified').checked}:{})};
+    const options={...result,dateFrom:field('date-from').value,dateTo:field('date-to').value,grouping:field('grouping').value,hidePlayed:field('hide-played').checked,...(!ics?{includeCombined:field('include-combined').checked,includeUnified:field('include-unified').checked}:{})};
     if(fixedSelection)return selectedExportSections({...options,selection:fixedSelection});
     return exportSections({...options,scope:field('scope').value,clubId:field('club').value,teamKey:preferredTeam});
   }
@@ -61,6 +66,8 @@ export function openCalendarExport({ source, committees, committee, favorite, te
   }
   function selection() {
     const scope = field('scope').value;
+    field('date-from').max = field('date-to').value;
+    field('date-to').min = field('date-from').value;
     const chosen=catalog?.teams.filter(team=>team.key===preferredTeam)||[];
     if (ics) {
       const includeWarmup = field('include-warmup').checked;
@@ -96,7 +103,7 @@ export function openCalendarExport({ source, committees, committee, favorite, te
     if(ics&&scope==='club')note.textContent=ics?'Nello ZIP è incluso anche il calendario completo delle squadre selezionate.':'Include anche il calendario completo delle squadre selezionate.';
     if(contextual&&!fixedSelection&&scope==='team')dialog.querySelector('.export-subject').textContent=chosen.length===1?chosen[0].label:`${chosen.length} squadre selezionate`;
     const stats = ics ? icsExportStats(list) : null;
-    download.disabled = !list.length || (ics && !stats.dated);
+    download.disabled = !field('date-from').validity.valid || !field('date-to').validity.valid || !list.length || (ics && !stats.dated);
     if(ics) icsNote.textContent = `File unico senza duplicati. ${stats.allDay} gare senza orario come eventi giornalieri; ${stats.skipped} gare senza data escluse.`;
     const count=new Set(list.flatMap(section=>section.games.map(game=>`${game.committeeId}:${game.groupId}:${game.id}`))).size;
     status(`${count} partite · ${list.length} ${list.length === 1 ? 'calendario selezionato' : 'calendari selezionati'}`);
@@ -142,6 +149,7 @@ export function openCalendarExport({ source, committees, committee, favorite, te
     field('warmup-minutes').oninput = selection;
   }
   field('hide-played').onchange = selection;
+  for (const name of ['date-from', 'date-to']) field(name).onchange = selection;
   if(!ics)for(const name of ['include-combined','include-unified'])field(name).onchange=selection;
   dialog.querySelector('[data-reload]').onclick = load;
   download.onclick = async () => {
@@ -155,7 +163,7 @@ export function openCalendarExport({ source, committees, committee, favorite, te
       setTimeout(() => URL.revokeObjectURL(url), 30000);
       status(`Download pronto: ${file.filename}`);
     } catch (error) { if (!controller.signal.aborted) status(`Esportazione non riuscita: ${error.message}`); }
-    finally { if (dialog.open) { setBusy(false); const list=sections(); download.disabled=!list.length||(ics&&!icsExportStats(list).dated); } }
+    finally { if (dialog.open) { setBusy(false); const list=sections(); download.disabled=!field('date-from').validity.valid||!field('date-to').validity.valid||!list.length||(ics&&!icsExportStats(list).dated); } }
   };
   dialog.querySelector('.close').onclick = () => dialog.close();
   dialog.addEventListener('close', () => { controller?.abort(); dialog.remove(); }, { once: true });
