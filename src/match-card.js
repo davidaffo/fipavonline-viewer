@@ -1,5 +1,5 @@
 import { clubInfo } from './clubs.js';
-import { escapeHTML as e } from './data.js';
+import { dateISO, escapeHTML as e } from './data.js';
 
 export function venueURL(match) {
   const raw = [match['lat-stadium'], match['lng-stadium']];
@@ -27,6 +27,9 @@ export function renderMatchCard(match, { logo, star }) {
   const state = matchPresentation(match);
   const teams = [match.team1, match.team2];
   const time = String(match.time || '').replace(/^(\d{1,2})\.(\d{2})$/, '$1:$2');
+  const date = new Date(`${dateISO(match)}T12:00:00`);
+  const weekday = match.date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString('it-IT', { weekday: 'long' }) : '';
+  const dateLabel = match.date ? `${weekday ? weekday[0].toUpperCase() + weekday.slice(1) + ' ' : ''}${match.date}` : 'Data da definire';
   const meta = [match.day, match.ng ? `Gara ${match.ng}` : ''].filter(Boolean).join(' · ');
   const map = venueURL(match);
   const referees = [['1referee', '1° arbitro'], ['2referee', '2° arbitro']].filter(([key]) => String(match[key] || '').trim());
@@ -39,7 +42,7 @@ export function renderMatchCard(match, { logo, star }) {
   return `<article class="match">
     ${match.groupId ? `<div class="match-competition"><span>${e([match.groupTitle || 'Girone '+match.groupId,match.committeeTitle].filter(Boolean).join(' · '))}</span>${match.committeeId ? `<button type="button" data-match-standings="${e(match.groupId)}" data-committee="${e(match.committeeId)}" aria-label="Classifica: ${e(match.groupTitle || 'Girone '+match.groupId)}">Classifica ↗</button>` : ''}</div>` : ''}
     <div class="match-meta"><span>${e(meta)}</span><span class="badge ${state.live ? 'live' : ''}">${state.live ? '● ' : ''}${e(state.status)}</span></div>
-    <div class="match-schedule"><span class="match-date">${e(match.date || 'Data da definire')}</span><strong class="match-time">${e(time || 'Orario da definire')}</strong></div>
+    <div class="match-schedule"><span class="match-date">${e(dateLabel)}</span><strong class="match-time">${e(time || 'Orario da definire')}</strong></div>
     <div class="match-teams">${teams.map((team, i) => `${i ? result : ''}<div class="match-team">${society(team)}${logo(team)}<strong>${e(team?.title || 'Squadra da definire')}</strong>${star('team', team?.id, team?.title)}</div>`).join('')}</div>
     ${state.sets.length ? `<ol class="set-scores" aria-label="Parziali dei set">${state.sets.map(([a, b], i) => `<li aria-label="Set ${i + 1}: ${e(a)} a ${e(b)}"><span class="set-number">${i + 1}°</span><span>${e(a)}-${e(b)}</span></li>`).join('')}</ol>` : ''}
     <div class="match-details"><div class="match-venue"><span>${e(match.stadium || 'Impianto da definire')}</span>${map ? `<a href="${e(map)}" target="_blank" rel="noopener noreferrer">Mappa ↗</a>` : ''}</div>

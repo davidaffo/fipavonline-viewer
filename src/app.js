@@ -237,8 +237,8 @@ function renderCalendarGrid(games){
  const undated=games.filter(game=>!/^\d{4}-\d{2}-\d{2}$/.test(dateISO(game)));
  $('#list-title').textContent=`${inMonth.length} ${inMonth.length===1?'partita':'partite'} nel mese · ${games.length} totali`;
  return renderMonth(games,{month:calendarMonth,selectedDay:selectedCalendarDay})+
- (selectedCalendarDay?`<section id="calendar-day-detail" class="calendar-day-detail"><h3 class="date-heading">${e(new Date(selectedCalendarDay+'T12:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'}))}</h3>${selected.length?selected.map(matchCard).join(''):empty('Nessuna partita','Nessuna gara per questo giorno e per i filtri selezionati.')}</section>`:empty('Nessuna partita nel mese','Cambia mese o filtro squadra.'))+
- (undated.length?`<h3 class="date-heading">Data da definire</h3>${undated.map(matchCard).join('')}`:'');
+ (selectedCalendarDay?`<section id="calendar-day-detail" class="calendar-day-detail" aria-label="Partite del giorno selezionato">${selected.length?selected.map(matchCard).join(''):empty('Nessuna partita','Nessuna gara per questo giorno e per i filtri selezionati.')}</section>`:empty('Nessuna partita nel mese','Cambia mese o filtro squadra.'))+
+ (undated.length?undated.map(matchCard).join(''):'');
 }
 for(const id of ['date-from','date-to']){
  $('#'+id).value=id==='date-from'?dateFrom:dateTo;
@@ -334,7 +334,7 @@ async function loadFavoriteSchedule(signal,seq,favorites){
 function datedMatches(games){
  const dates=new Map();
  for(const game of games){const day=dateISO(game)||'da-definire';if(!dates.has(day))dates.set(day,[]);dates.get(day).push(game)}
- return [...dates].map(([day,list])=>`<h3 class="date-heading">${e(day==='da-definire'?'Data da definire':new Date(day+'T12:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'}))}</h3>${list.map(matchCard).join('')}`).join('');
+ return [...dates.values()].map(list=>list.map(matchCard).join('')).join('');
 }
 function scheduleDateRange(){
  if(calendarView!=='list')return {};
