@@ -141,3 +141,7 @@ button.action-delete{color:var(--delete);background:var(--delete-soft);border-co
 @media(max-width:640px){.app-update-banner{padding:12px;gap:10px;font-size:12px}.app-update-banner button{padding:10px;font-size:12px}}
 
 #range-navigation{display:flex;flex-wrap:wrap;gap:8px}#range-navigation label{display:flex;align-items:center;gap:8px;font-size:11px}#range-navigation input{min-width:0;min-height:36px;padding:6px 8px;font-size:12px}
+
+.match-schedule{display:flex;flex-direction:column;align-items:center;gap:3px;margin:12px 0 16px;text-align:center;line-height:1.35;font-variant-numeric:tabular-nums;color:var(--text)}
+.match-date{font-size:18px;font-weight:650}.match-time{font-size:26px;font-weight:750;color:var(--accent)}
+@media(max-width:640px){.match-date{font-size:16px}.match-time{font-size:24px}}
