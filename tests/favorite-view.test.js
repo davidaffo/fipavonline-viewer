@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { viewItems } from '../src/custom-views.js';
 import { favoriteCommittees, favoriteMatches, favoriteTeams } from '../src/favorite-view.js';
 const committees = [{ id: '03008', title: 'Centro', region: 'Liguria' }, { id: '03000', title: 'Regionale', region: 'Liguria' }, { id: '04000', title: 'Lombardia', region: 'Lombardia' }];
 const team = (id, code = '030080168') => ({ id, title: `Squadra ${id}`, cod_aff_societa: code, nome_societa: 'Società' });
@@ -53,4 +54,19 @@ test('partite aggregate: derby una volta, date ordinate e ID uguali in comitati 
  const games=favoriteMatches(records,favorites);
  assert.deepEqual(games.map(game=>`${game.committeeId}:${game.id}`),['03000:1','03008:1']);
  assert.deepEqual(favoriteMatches(records,[]),[]);
+});
+
+
+test('partite preferiti: società e squadre insieme includono tutte le gare senza duplicati', () => {
+ const records=[
+  record('03008','1','16/10/2026',team('1'),team('9','999')),
+  record('03008','2','17/10/2026',team('2'),team('9','999')),
+  record('03000','3','18/10/2026',team('3'),team('9','999')),
+  record('03008','4','19/10/2026',team('8','888'),team('9','999')),
+  record('03008','5','20/10/2026',team('7','777'),team('9','999')),
+ ];
+ const favorites=viewItems([club,{type:'team',id:'1',committee:'03008'},{type:'team',id:'8',committee:'03008'},{type:'group',id:'12',committee:'03008'}]);
+ assert.deepEqual(favoriteCommittees(favorites,committees).map(item=>item.id),['03008','03000']);
+ assert.deepEqual(favoriteMatches(records,favorites).map(game=>game.id),['1','2','3','4']);
+ assert.deepEqual(favoriteMatches(records,viewItems([club])).map(game=>game.id),['1','2','3']);
 });

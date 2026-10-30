@@ -4,7 +4,7 @@ import { escapeHTML as e } from './data.js';
 import { loadExportRecords } from './export-data.js';
 import { exportCatalog, exportSections, selectedExportSections, buildCalendarDownload, OPTIONAL_EXPORT_COLUMNS } from './calendar-export.js';
 
-export function openCalendarExport({ source, committees, committee, favorite, teamKey, cached, selection: selectedItems = null, fileType = 'xlsx', dateRange = {}, hidePlayed = false }) {
+export function openCalendarExport({ source, committees, committee, favorite, teamKey, cached, selection: selectedItems = null, fileType = 'xlsx', dateRange = {}, hidePlayed = true }) {
   if (!['xlsx', 'ics'].includes(fileType)) throw new Error('Formato di esportazione non valido.');
   const ics = fileType === 'ics';
   const dialog = document.createElement('dialog');

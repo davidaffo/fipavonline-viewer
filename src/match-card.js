@@ -41,7 +41,6 @@ export function renderMatchCard(match, { logo, star }) {
     <div class="match-meta"><span>${e(meta)}</span><span class="badge ${state.live ? 'live' : ''}">${state.live ? '● ' : ''}${e(state.status)}</span></div>
     <div class="match-teams">${teams.map((team, i) => `${i ? result : ''}<div class="match-team">${society(team)}${logo(team)}<strong>${e(team?.title || 'Squadra da definire')}</strong>${star('team', team?.id, team?.title)}</div>`).join('')}</div>
     ${state.sets.length ? `<ol class="set-scores" aria-label="Parziali dei set">${state.sets.map(([a, b], i) => `<li aria-label="Set ${i + 1}: ${e(a)} a ${e(b)}"><span class="set-number">${i + 1}°</span><span>${e(a)}-${e(b)}</span></li>`).join('')}</ol>` : ''}
-    ${state.official ? `<p class="result-official">${e(state.official)}</p>` : ''}
     <div class="match-details"><div class="match-venue"><span>${e(match.stadium || 'Impianto da definire')}</span>${map ? `<a href="${e(map)}" target="_blank" rel="noopener noreferrer">Mappa ↗</a>` : ''}</div>
     ${referees.length ? `<dl class="match-referees">${referees.map(([key, label]) => `<div><dt>${label}</dt><dd>${e(String(match[key]).trim())}</dd></div>`).join('')}</dl>` : '<p class="referees-missing">Arbitri non indicati</p>'}
     </div>

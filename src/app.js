@@ -19,7 +19,7 @@ let prefs=read('vl-prefs',{committee:'',group:'',favorites:[]});
 if(!Array.isArray(prefs.favorites))prefs.favorites=[];
 prefs.views=Array.isArray(prefs.views)?prefs.views.filter(view=>view&&typeof view.id==='string'&&typeof view.title==='string').map(view=>({...view,items:viewItems(view.items)})):[];
 let tab='calendar',filter='all',query='',date=localDate(),groups=[],record=null,loading=false,request=0,controller;
-let standingsReturn=null,hidePlayed=false,currentViewGames=[];
+let standingsReturn=null,hidePlayed=true,currentViewGames=[];
 let committeeList=[],selectedFavorite=null,detailRecords=[],profileTeamsOpen=true;
 const clubExpansions=new Map();
 const exportSelection=new Map();
@@ -34,7 +34,7 @@ const message=(text,help=false)=>{$('#notice').innerHTML=text?`<div class="notic
 const activeCustomView=()=>prefs.views.find(view=>tab===`view:${view.id}`);
 const isAggregateView=()=>tab==='favorite-matches'||tab.startsWith('view:');
 const isScheduleView=()=>tab==='calendar'||tab==='favorite-detail'||isAggregateView();
-const aggregateItems=()=>activeCustomView()?.items||prefs.favorites.filter(favorite=>favorite.type==='team');
+const aggregateItems=()=>activeCustomView()?.items||viewItems(prefs.favorites);
 function updateNavigation(){
  const current=tab==='favorite-detail'?'favorites':tab;
  document.querySelectorAll('nav [data-tab]').forEach(button=>{button.classList.toggle('active',button.dataset.tab===current);button.setAttribute('aria-current',button.dataset.tab===current?'page':'false')});
@@ -124,7 +124,7 @@ async function load(){
  $('#championship-wrap').hidden=!['calendar','standings'].includes(tab);$('#group-wrap').hidden=!['calendar','standings'].includes(tab);$('.segmented').hidden=tab!=='calendar';
  $('#standings-back').hidden=tab!=='standings'||!standingsReturn;
  $('#favorite-back').hidden=tab!=='favorite-detail';
- const titles={calendar:['Calendario','Partite del comitato selezionato.','Partite'],standings:['Classifica','Classifica del girone selezionato.','Classifica'],clubs:['Società','Società presenti nei calendari del comitato.','Società'],favorites:['Preferiti','Società, squadre e gironi salvati.','Preferiti'],'favorite-matches':['Partite preferiti','Tutte le date e i comitati delle squadre salvate.','Partite']};
+ const titles={calendar:['Calendario','Partite del comitato selezionato.','Partite'],standings:['Classifica','Classifica del girone selezionato.','Classifica'],clubs:['Società','Società presenti nei calendari del comitato.','Società'],favorites:['Preferiti','Società, squadre e gironi salvati.','Preferiti'],'favorite-matches':['Partite preferiti','Tutte le date e i comitati delle squadre e società salvate.','Partite']};
  const t=activeCustomView()?[activeCustomView().title,'Partite delle squadre e società selezionate.','Partite']:tab==='favorite-detail'?[selectedFavorite?.title||'Preferito',selectedFavorite?.type==='club'?'Società · Tutte le squadre e i comitati della regione.':'Squadra · Tutte le partite disponibili.','Partite']:titles[tab];$('#page-title').textContent=t[0];$('#subtitle').textContent=t[1];$('#list-title').textContent=t[2];
  if(tab==='favorites'){render();return}
  if(tab==='favorite-detail'){if(!selectedFavorite){switchTab('favorites');return}await loadFavoriteSchedule(signal,seq,[selectedFavorite]);return}
@@ -352,9 +352,9 @@ function renderSchedule(games,{prefix='',heading='',summary='',emptyTitle='Nessu
 function renderFavoriteMatches(){
  const favorites=aggregateItems();
  renderSchedule(favoriteMatches(detailRecords,favorites),{
-  summary:` · ${favorites.length} ${activeCustomView()?'voci':favorites.length===1?'squadra':'squadre'}`,
-  emptyTitle:!favorites.length?'Nessuna squadra preferita':loading?'Caricamento':'Nessuna partita disponibile',
-  emptyText:!favorites.length?'Salva le squadre usando la stella accanto al nome.':loading?'Recupero dei calendari.':'Nessuna partita da mostrare con i filtri attivi.',
+  summary:` · ${favorites.length} ${favorites.length===1?'voce':'voci'}`,
+  emptyTitle:!favorites.length?'Nessuna squadra o società preferita':loading?'Caricamento':'Nessuna partita disponibile',
+  emptyText:!favorites.length?'Salva squadre o società usando la stella accanto al nome.':loading?'Recupero dei calendari.':'Nessuna partita da mostrare con i filtri attivi.',
  });
  bindCards();
 }
@@ -447,7 +447,7 @@ async function startCalendarExport(button,favorite=null,fileType='xlsx',selectio
  button.disabled=true;
  try{
   const {openCalendarExport}=await import('./export-dialog.js');
-  openCalendarExport({source:dataSource,committees:committeeList,committee:prefs.committee,fileType,selection,dateRange:isScheduleView()?scheduleDateRange():{},hidePlayed:isScheduleView()&&hidePlayed,
+  openCalendarExport({source:dataSource,committees:committeeList,committee:prefs.committee,fileType,selection,dateRange:isScheduleView()?scheduleDateRange():{},hidePlayed:isScheduleView()?hidePlayed:true,
    favorite:favorite?enrichTeamFavorite(favorite,favoriteContextRecords()):null,
    cached:cachedScheduleRecords
   });
