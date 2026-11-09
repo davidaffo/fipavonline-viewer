@@ -1,8 +1,8 @@
 {
-  "startedAt": 1794136674145,
-  "finishedAt": 1794136713103,
+  "startedAt": 1794228795472,
+  "finishedAt": 1794228831297,
   "status": "success",
-  "saved": 138,
+  "saved": 140,
   "results": [
     {
       "committee": "03000",
@@ -13,7 +13,7 @@
     {
       "committee": "03008",
       "title": "C.T. LIGURIA CENTRO",
-      "saved": 44,
+      "saved": 46,
       "failures": []
     },
     {
