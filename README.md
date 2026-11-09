@@ -1,6 +1,6 @@
 # FIPAVonline Viewer
 
-[Apri l’app](https://davidaffo.github.io/fipavonline-viewer/) · [Repository GitHub](https://github.com/davidaffo/fipavonline-viewer)
+[Apri l’app](https://fipavonline-viewer.davidaffo.com/) · [Repository GitHub](https://github.com/davidaffo/fipavonline-viewer)
 
 PWA con Vite e JavaScript, senza backend o proxy. Sorgenti in `src/`, asset statici in `public/`, ingresso in `index.html`. Manifest e service worker sono generati da `vite-plugin-pwa` durante la build.
 
@@ -105,3 +105,14 @@ Il selettore **Lista / Mese** è condiviso da tutte le viste con partite: Calend
 
 
 **Esporta vista · Excel / ICS** è disponibile in tutte le viste con partite: Calendario, squadra, società, Partite preferiti e viste personalizzate. Esporta esattamente le gare incluse nella vista al momento del clic, rispettando tutti i filtri attivi (campionato, girone, squadra, preferite/in corso, gare concluse e periodo). Con **Per giorno** o **Intervallo** include soltanto le date selezionate; con **Tutte le date** e nella navigazione **Mese** include tutte le date della vista. L'esportazione usa i dati già visualizzati, senza caricare altri calendari, e produce un solo foglio Excel con Campionato e Girone oppure un unico calendario ICS. Nel pannello si possono scegliere le colonne opzionali Excel o il nome e il riscaldamento ICS; per cambiare le gare da esportare si modificano i filtri nella vista. Le gare senza data valida sono incluse in Excel quando non si filtra il periodo ed escluse da ICS, con conteggio esplicito. I pulsanti sono disabilitati quando la vista non contiene partite. Le esportazioni dalle checkbox di società e squadre mantengono il proprio pannello di selezione.
+
+
+## Dominio pubblico
+
+Sito: https://fipavonline-viewer.davidaffo.com/
+
+Il workflow GitHub Actions esistente pubblica la build con Custom domain `fipavonline-viewer.davidaffo.com`; non serve un file CNAME nel repository.
+
+Su Cloudflare usare un CNAME `fipavonline-viewer` verso `davidaffo.github.io`, in modalità DNS only. Abilitare Enforce HTTPS su GitHub quando il certificato è disponibile. I percorsi relativi degli asset supportano la radice del nuovo dominio.
+
+Il nuovo sottodominio ha un archivio del browser separato. I dati del vecchio indirizzo non migrano automaticamente: esportare quelli ancora disponibili e importarli dalla nuova app, quando la funzione è disponibile. Per usare il nuovo indirizzo come PWA, installare l’app dal nuovo dominio.
