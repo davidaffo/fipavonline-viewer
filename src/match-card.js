@@ -1,5 +1,6 @@
 import { clubInfo } from './clubs.js';
 import { dateISO, escapeHTML as e } from './data.js';
+import { matchICSStart, matchICSUID } from './ics-export.js';
 
 export function venueURL(match) {
   const raw = [match['lat-stadium'], match['lng-stadium']];
@@ -48,5 +49,6 @@ export function renderMatchCard(match, { logo, star }) {
     <div class="match-details"><div class="match-venue"><span>${e(match.stadium || 'Impianto da definire')}</span>${map ? `<a href="${e(map)}" target="_blank" rel="noopener noreferrer">Mappa ↗</a>` : ''}</div>
     ${referees.length ? `<dl class="match-referees">${referees.map(([key, label]) => `<div><dt>${label}</dt><dd>${e(String(match[key]).trim())}</dd></div>`).join('')}</dl>` : '<p class="referees-missing">Arbitri non indicati</p>'}
     </div>
+    <div class="match-calendar"><button type="button" data-match-calendar="${e(matchICSUID(match))}" ${matchICSStart(match) ? '' : 'disabled title="Data della partita da definire"'}>Salva nel calendario</button></div>
   </article>`;
 }

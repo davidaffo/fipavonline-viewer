@@ -12,6 +12,7 @@
     "sync:configured": "node scripts/sync-configured.mjs"
   },
   "devDependencies": {
+    "@xmldom/xmldom": "^0.9.12",
     "ical.js": "^2.2.1",
     "vite": "^8.3.4",
     "vite-plugin-pwa": "^2.0.0"

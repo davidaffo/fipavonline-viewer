@@ -5,6 +5,7 @@ import { favoriteCommittees, favoriteMatches, favoriteTeams } from './favorite-v
 import { calendarTeams, initialMonth, monthCells, monthLabel, renderMonth, shiftMonth, fitMonthGrid } from './calendar.js';
 import { collectClubs, matchIsFavorite } from './clubs.js';
 import { renderMatchCard } from './match-card.js';
+import { matchICSUID } from './ics-export.js';
 import { filterSchedule, isPlayedMatch } from './schedule-filters.js';
 import { scheduleMatches, combinedRecord } from './schedule.js';
 import { registerSW } from 'virtual:pwa-register';
@@ -22,6 +23,7 @@ let tab='calendar',filter='all',query='',date=localDate(),groups=[],record=null,
 let standingsReturn=null,hidePlayed=true,currentViewGames=[];
 let committeeList=[],selectedFavorite=null,detailRecords=[],profileTeamsOpen=true;
 const clubExpansions=new Map();
+const calendarMatches=new Map();
 const exportSelection=new Map();
 let teamFilter='',calendarMonth='',selectedCalendarDay='',calendarView='list';
 let dateScope=read('vl-date-scope',calendarView==='list'?'all':'day');
@@ -147,7 +149,7 @@ function star(type,id,title,logo='',committee=prefs.committee){if(!id)return '';
 const fallbackLogo=`${import.meta.env.BASE_URL}club.svg`;
 function clubLogo(team){return `<img class="team-logo" src="${e(teamLogo(team)||fallbackLogo)}" alt="" width="32" height="32" loading="lazy" decoding="async" referrerpolicy="no-referrer">`}
 document.addEventListener('error',event=>{const img=event.target;if(img instanceof HTMLImageElement&&img.classList.contains('team-logo')&&!img.dataset.fallback){img.dataset.fallback='true';img.src=fallbackLogo}},true);
-function matchCard(match){return renderMatchCard({...match,committeeId:match.committeeId||prefs.committee},{logo:clubLogo,star:(type,id,title,logo)=>star(type,id,title,logo,match.committeeId||prefs.committee)})}
+function matchCard(match){const game={...match,committeeId:match.committeeId||prefs.committee};calendarMatches.set(matchICSUID(game),game);return renderMatchCard(game,{logo:clubLogo,star:(type,id,title,logo)=>star(type,id,title,logo,game.committeeId)})}
 function favoriteContextRecords(){
  const records=[...detailRecords];
  for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key.startsWith('vl-data:')){const rec=read(key,null);if(rec)records.push({...rec,committee:key.split(':')[1]})}}
@@ -173,6 +175,7 @@ function savedClub(favorite,records){
 }
 
 function render(){
+ calendarMatches.clear();
  currentViewGames=[];
  for(const button of document.querySelectorAll('[data-view-export]'))button.disabled=true;
  $('#fav-count').textContent=prefs.favorites.length;
@@ -271,6 +274,13 @@ function groupHeading(id,title){
  return `<div class="group-heading"><div><span class="championship-name">${e(info.championshipTitle)}</span><strong>${e(info.groupTitle)}</strong></div>${star('group',id,`${info.championshipTitle} - ${info.groupTitle}`)}</div>`;
 }
 function bindCards(){
+ document.querySelectorAll('[data-match-calendar]').forEach(button=>button.onclick=async()=>{
+  const game=calendarMatches.get(button.dataset.matchCalendar);
+  if(!game)return;
+  const records=favoriteContextRecords();
+  try{const {openMatchCalendar}=await import('./match-calendar.js');openMatchCalendar(game,records)}
+  catch(error){message(`Calendario non disponibile: ${error.message}`)}
+ });
  updateExportSelection();
  fitMonthGrid($('.month-grid'));
  document.querySelectorAll('[data-calendar-day]').forEach(button=>button.onclick=()=>{selectedCalendarDay=button.dataset.calendarDay;date=selectedCalendarDay;dateScope='day';write('vl-date-scope',dateScope);$('#date').value=date;render();$('#calendar-day-detail')?.scrollIntoView({behavior:'smooth',block:'start'})});
