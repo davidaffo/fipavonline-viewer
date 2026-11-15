@@ -205,7 +205,7 @@ function render(){
  if(!record){$('#results').innerHTML=empty('Nessun dato disponibile','Aggiorna oppure importa un file JSON FIPAV.','<button id="empty-import">Importa dati</button>');$('#empty-import').onclick=openHelp;return}
  if(tab==='clubs'){renderClubs();return}
  if(tab==='standings'){
- const d=payload(record.json),teams=d?.teams||[];const rows=teams;$('#results').innerHTML=teams.length?`${groupHeading(prefs.group,d.title||d.descrizione||'Classifica')}<div class="table-scroll"><table><caption class="skip">Classifica del girone</caption><thead><tr>${['Pos.','Squadra','Punti','G','V','P','SV','SP'].map(h=>`<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${rows.map((t,i)=>`<tr><td>${e(t.pos??i+1)}</td><td><div class="standing-team">${clubLogo(t)}<span>${e(t.title||t.squadra||t.nome_squadra)}</span>${star('team',t.id,t.title||t.squadra||t.nome_squadra)}</div></td>${['p','g','gv','gp','sv','sp'].map(k=>`<td>${e(t[k]??0)}</td>`).join('')}</tr>`).join('')}</tbody></table></div><p class="fine">G: gare · V: vinte · P: perse · SV / SP: set vinti / persi</p>`:empty('Classifica non pubblicata','Non ci sono squadre nella risposta ricevuta.');bindCards();return}
+ const d=payload(record.json),teams=d?.teams||[];const rows=teams;$('#results').innerHTML=teams.length?`${groupHeading(prefs.group,d.title||d.descrizione||'Classifica')}<div class="table-scroll"><table><caption class="skip">Classifica del girone</caption><thead><tr>${['Pos.','Squadra','Punti','G','V','P','SV','SP'].map(h=>`<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${rows.map((t,i)=>`<tr><td>${e(t.pos??i+1)}</td><td><div class="standing-team">${t.id?`<button type="button" class="team-open standing-team-open" data-open-team="${e(t.id)}" data-team-title="${e(t.title||t.squadra||t.nome_squadra||'Squadra')}" data-team-committee="${e(prefs.committee)}">${clubLogo(t)}<span>${e(t.title||t.squadra||t.nome_squadra)}</span></button>`:`${clubLogo(t)}<span>${e(t.title||t.squadra||t.nome_squadra)}</span>`}${star('team',t.id,t.title||t.squadra||t.nome_squadra)}</div></td>${['p','g','gv','gp','sv','sp'].map(k=>`<td>${e(t[k]??0)}</td>`).join('')}</tr>`).join('')}</tbody></table></div><p class="fine">G: gare · V: vinte · P: perse · SV / SP: set vinti / persi</p>`:empty('Classifica non pubblicata','Non ci sono squadre nella risposta ricevuta.');bindCards();return}
  const scoped=filterSchedule(scheduleMatches([record]),{groups,championship:prefs.championship,group:prefs.group});
  updateTeamOptions(scoped);
  const all=filterSchedule(scoped,{team:teamFilter});
@@ -300,11 +300,12 @@ function bindCards(){
   savePrefs();render();
  });
  document.querySelectorAll('[data-remove]').forEach(button=>button.onclick=()=>{prefs.favorites=prefs.favorites.filter(f=>f.key!==button.dataset.remove);savePrefs();render()});
- document.querySelectorAll('[data-open-team]').forEach(button=>button.onclick=()=>openFavorite({type:'team',id:button.dataset.openTeam,title:button.dataset.teamTitle,logo:button.dataset.teamLogo||'',committee:button.dataset.teamCommittee}));
+ document.querySelectorAll('[data-open-team]').forEach(button=>button.onclick=()=>openFavorite({type:'team',id:button.dataset.openTeam,title:button.dataset.teamTitle,logo:button.dataset.teamLogo||'',committee:button.dataset.teamCommittee||prefs.committee}));
  document.querySelectorAll('[data-open-favorite]').forEach(button=>button.onclick=()=>{const favorite=prefs.favorites.find(f=>f.key===button.dataset.openFavorite);if(favorite)openFavorite(favorite)});
 }
 function openFavorite(favorite){
  if(favorite.type==='group'){prefs.committee=favorite.committee;prefs.group=favorite.id;$('#committee').value=prefs.committee;savePrefs();calendarView='list';dateScope='all';write('vl-date-scope',dateScope);switchTab('calendar');return}
+ if(favorite.type==='team'){hidePlayed=false;calendarView='list';dateScope='all';write('vl-date-scope',dateScope)}
  selectedFavorite=enrichTeamFavorite({...favorite},favoriteContextRecords());detailRecords=[];profileTeamsOpen=true;switchTab('favorite-detail');
  $('#page-title').scrollIntoView({block:'start'});
 }
