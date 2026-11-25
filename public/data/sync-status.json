@@ -1,8 +1,8 @@
 {
-  "startedAt": 1795531985714,
-  "finishedAt": 1795532032624,
+  "startedAt": 1795616590458,
+  "finishedAt": 1795616627417,
   "status": "success",
-  "saved": 142,
+  "saved": 148,
   "results": [
     {
       "committee": "03000",
@@ -19,13 +19,13 @@
     {
       "committee": "03011",
       "title": "C.T. LIGURIA PONENTE",
-      "saved": 40,
+      "saved": 44,
       "failures": []
     },
     {
       "committee": "03104",
       "title": "C.T. LIGURIA LEVANTE",
-      "saved": 30,
+      "saved": 32,
       "failures": []
     }
   ]
